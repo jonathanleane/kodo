@@ -42,17 +42,17 @@ cp .env.example .env
 # Edit .env and add your OpenAI API key
 ```
 
-3. Start the development environment using Docker Compose
+3. Start the development environment with a single command
 
 ```bash
-docker-compose up
-```
-
-4. In a separate terminal, start the React Native development server
-
-```bash
-cd src/client
+# Start both backend (using Docker) and frontend with one command
 npm start
+
+# Alternatively, if you want to run backend in detached mode
+npm run docker:dev
+
+# To stop the Docker containers
+npm run stop
 ```
 
 5. Use Expo to run the app on your mobile device or emulator
