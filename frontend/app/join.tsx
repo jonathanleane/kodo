@@ -18,7 +18,8 @@ import { DefaultEventsMap } from '@socket.io/component-emitter';
 import { Button as PaperButton } from 'react-native-paper';
 
 // TODO: Replace with your actual backend URL if deployed
-const BACKEND_URL = 'http://localhost:3001'; // Default for local dev
+// const BACKEND_URL = 'http://localhost:3001'; // Default for local dev
+const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Deployed backend URL
 
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
