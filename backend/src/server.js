@@ -36,10 +36,20 @@ const openai = new OpenAI({
 let redisClient;
 (async () => {
   try {
+    // Use the DATABASE_URL environment variable provided by DigitalOcean
+    const redisUrl = process.env.DATABASE_URL;
+    if (!redisUrl) {
+        throw new Error('DATABASE_URL environment variable not set for Redis connection.');
+    }
+    console.log("Connecting to Redis using provided URL...");
     redisClient = redis.createClient({
-      // Add your Redis connection details here if needed
-      // e.g., url: process.env.REDIS_URL or socket: { host: '...', port: ... }
-      // Defaults to redis://localhost:6379 if not specified
+      // Pass the connection string URL directly
+      url: redisUrl,
+      // Add TLS settings for secure connections on DO Managed Redis
+      socket: {
+          tls: true,
+          rejectUnauthorized: false // Necessary for some DO Redis configs, consider security implications
+      }
     });
     redisClient.on('error', (err) => console.error('Redis Client Error:', err));
     await redisClient.connect();
