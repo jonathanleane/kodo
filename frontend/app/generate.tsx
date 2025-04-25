@@ -35,8 +35,8 @@ const WEB_APP_PORT = 8081; // Default Expo web port
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
 
-// Define the path for Socket.IO (must match server)
-const socketIoPath = "/socket.io";
+// Define the path for Socket.IO (must match server and ingress)
+const socketIoPath = "/api/socket.io";
 
 export default function GenerateQRScreen() {
   const [token, setToken] = useState<string | null>(null);

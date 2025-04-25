@@ -24,8 +24,8 @@ const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Deployed bac
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
 
-// Define the path for Socket.IO (must match server)
-const socketIoPath = "/socket.io";
+// Define the path for Socket.IO (must match server and ingress)
+const socketIoPath = "/api/socket.io";
 
 // --- Message Bubble Component ---
 const MessageBubble = ({ message }: { message: any }) => {
