@@ -1,0 +1,27 @@
+{
+  "name": "kodo",
+  "version": "0.1.0",
+  "description": "Real-time translation chat app",
+  "scripts": {
+    "dev:server": "cd src/server && npm run dev",
+    "dev:client": "cd src/client && npm run start",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "install:all": "npm install && npm run install:client && npm run install:server",
+    "install:client": "cd src/client && npm install",
+    "install:server": "cd src/server && npm install",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "translation",
+    "chat",
+    "react-native",
+    "socket.io",
+    "openai"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "typescript": "^5.0.0"
+  }
+}
