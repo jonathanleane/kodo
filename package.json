@@ -1,30 +1,31 @@
 {
   "name": "kodo",
-  "version": "0.1.0",
-  "description": "Real-time translation chat app",
+  "version": "1.0.0",
+  "description": "Real-Time Translation Chat App",
+  "main": "index.js",
   "scripts": {
-    "dev:server": "cd src/server && npm run dev",
-    "dev:client": "cd src/client && npm run start",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "docker:dev": "docker-compose up -d && npm run dev:client",
-    "start": "docker-compose up -d && npm run dev",
-    "stop": "docker-compose down",
-    "install:all": "npm install && npm run install:client && npm run install:server",
-    "install:client": "cd src/client && npm install",
-    "install:server": "cd src/server && npm install",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npx expo start",
+    "dev": "concurrently \"npm:start:backend\" \"npm:start:frontend\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
-    "translation",
     "chat",
+    "translation",
     "react-native",
+    "expo",
     "socket.io",
+    "nodejs",
     "openai"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "ISC",
+  "type": "commonjs",
   "devDependencies": {
-    "concurrently": "^8.2.0",
-    "typescript": "^5.0.0"
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "expo": "^52.0.46",
+    "react-native-paper": "^5.13.4"
   }
 }

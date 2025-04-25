@@ -1,48 +1,40 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
+# Node Modules (Root)
+/node_modules
 
-# Testing
-coverage/
-
-# Production
-build/
-dist/
-
-# Misc
+# OS generated files
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE / Editor specific files
+.idea/
+.vscode/
+*.swp
+*~
+*.sublime-project
+*.sublime-workspace
 
 # Logs
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+lerna-debug.log*
 
-# Editor directories and files
-.idea/
-.vscode/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Build / Dist outputs (if any at root)
+/dist
+/build
 
-# Mobile specific
-android/app/build/
-ios/Pods/
-*.pbxuser
-*.mode1v3
-*.mode2v3
-*.perspectivev3
-*.xcuserstate
-project.xcworkspace/
-xcuserdata/
+# Environment variables (if any at root, though they should be in subdirs)
+.env*
+!.env.example
 
-# Temporary files
-.tmp/
-.temp/
+# Other
+.npm
+.yarn-integrity
+.pnp.*

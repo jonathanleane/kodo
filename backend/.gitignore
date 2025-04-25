@@ -1,0 +1,20 @@
+# Dependencies
+/node_modules
+
+# Environment Variables
+.env*
+
+# Build outputs
+/dist
+/build
+
+# Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Misc
+.DS_Store
+*.pem
+*.cer 
