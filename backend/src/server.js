@@ -119,15 +119,19 @@ app.post('/generate-qr', async (req, res) => {
 
 // --- WebSocket Event Handling ---
 io.on('connection', (socket) => {
+    console.log(`WebSocket connection received! Socket ID: ${socket.id}, Transport: ${socket.conn.transport.name}`);
+
     console.log(`User connected: ${socket.id}`);
 
     // TODO: Handle 'join' event from Scanner (Client B)
     socket.on('join', async ({ token, language }) => {
         console.log(`Join attempt received from ${socket.id} (Client B) with token: ${token}, language: ${language}`);
-        // 1. Validate token against Redis store
         const tokenKey = `qr_token:${token}`;
         try {
+            console.log(`[Redis GET ${tokenKey}] Attempting...`);
             const tokenDataString = await redisClient.get(tokenKey);
+            console.log(`[Redis GET ${tokenKey}] Result: ${tokenDataString ? 'Found' : 'Not Found'}`);
+
             if (!tokenDataString) {
                 console.log(`Token ${token} not found or expired.`);
                 socket.emit('error', { message: 'Invalid or expired QR code.' });
@@ -168,12 +172,19 @@ io.on('connection', (socket) => {
                 userA: { socketId: userA_SocketId, language: userA_Language },
                 userB: { socketId: clientB_SocketId, language: userB_Language }
             });
-            // Store room data (potentially with TTL or manage cleanup on disconnect)
+            console.log(`[Redis SET ${roomKey}] Attempting...`);
             await redisClient.set(roomKey, roomData);
+            console.log(`[Redis SET ${roomKey}] Success.`);
 
             // Store socketId -> roomId mappings for easy lookup on disconnect
-            await redisClient.set(`user_socket:${userA_SocketId}`, roomId);
-            await redisClient.set(`user_socket:${clientB_SocketId}`, roomId);
+            const userAKey = `user_socket:${userA_SocketId}`;
+            const userBKey = `user_socket:${clientB_SocketId}`;
+            console.log(`[Redis SET ${userAKey}] Attempting...`);
+            await redisClient.set(userAKey, roomId);
+            console.log(`[Redis SET ${userAKey}] Success.`);
+            console.log(`[Redis SET ${userBKey}] Attempting...`);
+            await redisClient.set(userBKey, roomId);
+            console.log(`[Redis SET ${userBKey}] Success.`);
 
             // 5. Add both sockets (A and B) to the Socket.IO room
             userASocket.join(roomId);
@@ -181,8 +192,9 @@ io.on('connection', (socket) => {
             console.log(`Sockets ${userA_SocketId} and ${clientB_SocketId} joined Socket.IO room ${roomId}`);
 
             // 6. Remove/invalidate the token in Redis (it's used)
+            console.log(`[Redis DEL ${tokenKey}] Attempting...`);
             await redisClient.del(tokenKey);
-            console.log(`Token ${token} deleted from Redis.`);
+            console.log(`[Redis DEL ${tokenKey}] Success.`);
 
             // 7. Emit 'joinedRoom' to both users
             // Notify User B (Scanner)
@@ -194,7 +206,7 @@ io.on('connection', (socket) => {
             console.log(`Successfully paired users in room ${roomId}`);
 
         } catch (err) {
-            console.error("Error processing join event:", err);
+            console.error("[Redis during JOIN] Error processing join event:", err);
             socket.emit('error', { message: 'Failed to join room due to server error.' });
         }
     });
@@ -204,17 +216,16 @@ io.on('connection', (socket) => {
         console.log(`generateToken request received from ${socket.id}`);
         const token = crypto.randomBytes(16).toString('hex');
         const tokenKey = `qr_token:${token}`;
-        // Store the requesting user's socket ID directly
         const tokenData = JSON.stringify({ requestingUserId: socket.id, createdAt: Date.now() });
-        const ttlInSeconds = 120; // Increase TTL slightly? (e.g., 120s)
+        const ttlInSeconds = 120;
 
         try {
+            console.log(`[Redis SET ${tokenKey}] Attempting...`);
             await redisClient.set(tokenKey, tokenData, { EX: ttlInSeconds });
-            console.log(`Stored token ${token} for user ${socket.id} with TTL ${ttlInSeconds}s`);
-            // Send the token back to the requesting client (User A)
+            console.log(`[Redis SET ${tokenKey}] Success. Stored token ${token} for user ${socket.id} with TTL ${ttlInSeconds}s`);
             socket.emit('tokenGenerated', token);
         } catch (err) {
-            console.error("Redis error storing token for generateToken event:", err);
+            console.error(`[Redis SET ${tokenKey}] Error storing token for generateToken event:`, err);
             socket.emit('error', { message: "Failed to generate QR token due to server error." });
         }
     });
@@ -233,8 +244,10 @@ io.on('connection', (socket) => {
         const senderSocketId = socket.id;
 
         try {
-            // 1. Get Room Data from Redis
+            console.log(`[Redis GET ${roomKey}] Attempting for sendMessage...`);
             const roomDataString = await redisClient.get(roomKey);
+            console.log(`[Redis GET ${roomKey}] Result for sendMessage: ${roomDataString ? 'Found' : 'Not Found'}`);
+
             if (!roomDataString) {
                 console.error(`Room data not found for room ${roomId}`);
                 socket.emit('error', { message: 'Error: You are not in a valid room.' });
@@ -329,7 +342,7 @@ io.on('connection', (socket) => {
             console.log(`Emitted 'newMessage' back to sender ${senderSocketId}`);
 
         } catch (err) {
-            console.error("Error processing sendMessage:", err);
+            console.error("[Redis during SEND] Error processing sendMessage:", err);
             socket.emit('error', { message: 'Server error processing your message.' });
         }
     });
@@ -342,7 +355,9 @@ io.on('connection', (socket) => {
         try {
             // 1. Find which room the disconnecting user was in
             const userRoomKey = `user_socket:${disconnectedSocketId}`;
+            console.log(`[Redis GET ${userRoomKey}] Attempting for disconnect...`);
             const roomId = await redisClient.get(userRoomKey);
+            console.log(`[Redis GET ${userRoomKey}] Result for disconnect: ${roomId ? roomId : 'Not Found'}`);
 
             if (roomId) {
                 console.log(`User ${disconnectedSocketId} was in room ${roomId}`);
@@ -368,23 +383,33 @@ io.on('connection', (socket) => {
                             partnerSocket.emit('partnerLeft');
                         }
                          // Remove the disconnected user's socket mapping
+                        console.log(`[Redis DEL ${userRoomKey}] Attempting for disconnect...`);
                         await redisClient.del(userRoomKey);
+                        console.log(`[Redis DEL ${userRoomKey}] Success for disconnect.`);
 
                         // Optionally: Leave room management to Redis TTL or implement explicit cleanup
                         // For now, let's remove the room data if one person leaves
                         console.log(`Removing room data for room ${roomId} as one user left.`);
+                        console.log(`[Redis DEL ${roomKey}] Attempting for disconnect cleanup...`);
                         await redisClient.del(roomKey);
+                        console.log(`[Redis DEL ${roomKey}] Success for disconnect cleanup.`);
                          // Also remove the partner's socket mapping
-                        await redisClient.del(`user_socket:${partnerSocketId}`);
+                        const partnerKey = `user_socket:${partnerSocketId}`;
+                        console.log(`[Redis DEL ${partnerKey}] Attempting partner cleanup...`);
+                        await redisClient.del(partnerKey);
+                        console.log(`[Redis DEL ${partnerKey}] Success partner cleanup.`);
 
                     } else {
                         // If no partner was found (maybe already disconnected), just clean up
                         console.log(`No partner found for disconnected user ${disconnectedSocketId} in room ${roomId}. Cleaning up.`);
+                         console.log(`[Redis DEL ${roomKey}] Attempting for disconnect cleanup...`);
                          await redisClient.del(roomKey);
-                         await redisClient.del(userRoomKey);
+                         console.log(`[Redis DEL ${roomKey}] Success for disconnect cleanup.`);
+                         await redisClient.del(userRoomKey); // Clean up potentially stale mapping
                     }
                 } else {
                     console.log(`Room data for room ${roomId} not found. Removing stale socket mapping ${userRoomKey}`);
+                     console.log(`[Redis DEL ${userRoomKey}] Attempting for disconnect...`);
                      await redisClient.del(userRoomKey); // Clean up potentially stale mapping
                 }
 
@@ -392,7 +417,7 @@ io.on('connection', (socket) => {
                 console.log(`User ${disconnectedSocketId} was not found in any active room.`);
             }
         } catch (err) {
-            console.error("Error handling disconnect:", err);
+            console.error("[Redis during DISCONNECT] Error handling disconnect:", err);
         }
     });
 
