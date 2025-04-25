@@ -24,6 +24,9 @@ const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Deployed bac
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
 
+// Define the path for Socket.IO (must match server)
+const socketIoPath = "/socket.io";
+
 // --- Message Bubble Component ---
 const MessageBubble = ({ message }: { message: any }) => {
   const isSelf = message.sender === 'self';
@@ -72,6 +75,7 @@ export default function JoinChatScreen() {
       socketRef.current = io(BACKEND_URL, {
           reconnectionAttempts: 3,
           transports: ['websocket'],
+          path: socketIoPath,
       });
 
       const socket = socketRef.current;

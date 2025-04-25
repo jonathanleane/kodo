@@ -20,9 +20,15 @@ if (!OPENAI_API_KEY) {
 
 const app = express();
 const server = http.createServer(app);
+
+// Define the path for Socket.IO
+const socketIoPath = "/socket.io"; // Standard path
+
 const io = new Server(server, {
+    // Tell Socket.IO server to listen on this path
+    path: socketIoPath,
     cors: {
-        origin: "*", // Allow all origins for now (adjust for production)
+        origin: "*", // Keep allowing all origins for now
         methods: ["GET", "POST"]
     }
 });
@@ -422,3 +428,6 @@ process.on('SIGINT', async () => { // Make async
       process.exit(0);
     });
   }); 
+
+// WebSocket connections will now happen at wss://<your-domain>/socket.io/
+// (Relative to the root, the ingress rule for /api/ needs to handle this) 

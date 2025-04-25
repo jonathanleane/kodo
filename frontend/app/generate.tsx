@@ -33,7 +33,10 @@ const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Deployed bac
 const WEB_APP_PORT = 8081; // Default Expo web port
 
 // Type for the socket instance
-type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>; // Use DefaultEventsMap or define custom events
+type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
+
+// Define the path for Socket.IO (must match server)
+const socketIoPath = "/socket.io";
 
 export default function GenerateQRScreen() {
   const [token, setToken] = useState<string | null>(null);
@@ -77,6 +80,8 @@ export default function GenerateQRScreen() {
     socketRef.current = io(backendTarget, {
       reconnectionAttempts: 5,
       transports: ['websocket'],
+      // Tell client to connect to this path
+      path: socketIoPath,
     });
 
     const socket = socketRef.current;
