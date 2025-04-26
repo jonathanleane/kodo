@@ -1,0 +1,15 @@
+[build]
+builder = "nixpacks"
+buildCommand = "npm install && npx expo export"
+
+[deploy]
+numReplicas = 1
+restartPolicyType = "always"
+sleepApplication = false
+startCommand = "./railway-run.sh"
+
+[service]
+autoDeploy = true
+healthcheckPath = "/"
+healthcheckTimeout = 300
+port = "80"
