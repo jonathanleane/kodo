@@ -51,26 +51,14 @@ export default function GenerateQRScreen() {
 
   // Configure the URL for QR code generation
   useEffect(() => {
-    // On deployed production environment, use the Railway frontend URL
-    const isProduction = window.location.hostname.includes('railway.app');
+    // ALWAYS use the production URL for the QR code in the deployed environment
+    // This ensures consistent behavior and prevents localhost URLs from appearing
+    console.log("Setting QR code URL to production frontend URL");
+    setWebAppBaseUrl(FRONTEND_URL);
     
-    if (isProduction) {
-      console.log("Using production frontend URL for QR code");
-      setWebAppBaseUrl(FRONTEND_URL);
-    } else if (Platform.OS !== 'web') {
-      // For mobile development, use device IP
-      Network.getIpAddressAsync().then((ipAddress: string) => {
-        console.log("Device IP Address:", ipAddress);
-        setWebAppBaseUrl(`http://${ipAddress}:${WEB_APP_PORT}`);
-      }).catch((err: any) => {
-        console.error("Could not get IP address:", err);
-        setError("Could not determine device IP address for QR code. Ensure you're on a network.");
-        setStatus("Error");
-      });
-    } else {
-      // For local web development
-      setWebAppBaseUrl(`http://localhost:${WEB_APP_PORT}`);
-    }
+    // Log the URL for debugging
+    console.log("QR Code will use URL:", FRONTEND_URL);
+    console.log("Current window.location.hostname:", window.location.hostname);
   }, []); // No dependencies needed
 
 
