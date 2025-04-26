@@ -80,20 +80,18 @@ export default function GenerateQRScreen() {
     // Log the connection attempt details
     console.log(`Attempting to connect to: ${backendTarget} with path: ${socketIoPath}`);
     
-    // Construct the full backend URL
-    const fullBackendURL = `${backendTarget}/backend-temp`;
-    console.log(`Using fully qualified backend URL: ${fullBackendURL}`);
+    // Socket.IO seems to struggle with DO Apps platform, let's try a simpler approach
+    // with direct backend endpoint 
+    const socketEndpoint = `${backendTarget}/backend-temp`;
+    console.log(`Using socket endpoint: ${socketEndpoint}`);
     
-    // Try with explicit URL format
-    socketRef.current = io(fullBackendURL, {
+    // Simplified connection options
+    socketRef.current = io(socketEndpoint, {
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
       timeout: 20000,
-      transports: ['polling'], // Force polling only
-      path: socketIoPath,
-      forceNew: true,
-      reconnection: true
+      transports: ['polling'],
+      forceNew: true
     });
 
     const socket = socketRef.current;

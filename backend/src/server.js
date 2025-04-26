@@ -22,23 +22,20 @@ const app = express();
 const server = http.createServer(app);
 
 // Define the path for Socket.IO (including the ingress prefix)
-const socketIoPath = "/socket.io"; // Use standard path instead of /api prefix for testing
+const socketIoPath = "/socket.io"; // Use standard path
 
 const io = new Server(server, {
-    // Tell Socket.IO server to listen on this path
-    path: socketIoPath,
+    // Use default configuration without custom path
     cors: {
         origin: "*", // Keep allowing all origins for now
         methods: ["GET", "POST"]
     },
-    // Add logging to troubleshoot connection issues
+    // Simplified options
     connectTimeout: 30000,
     pingTimeout: 60000,
-    upgradeTimeout: 30000,
-    transports: ['websocket', 'polling'], // Try both transports
-    perMessageDeflate: false, // Disable WebSocket compression
-    maxHttpBufferSize: 1e8, // Increase buffer size
-    httpCompression: false // Disable HTTP compression
+    transports: ['polling'],
+    // Reduce middleware complexity
+    maxHttpBufferSize: 1e6
 });
 
 // --- OpenAI Setup ---

@@ -74,19 +74,17 @@ export default function JoinChatScreen() {
 
       console.log(`Join screen: Connecting to ${BACKEND_URL} with path ${socketIoPath}`);
       
-      // Construct the full backend URL
-      const fullBackendURL = `${BACKEND_URL}/backend-temp`;
-      console.log(`Using fully qualified backend URL: ${fullBackendURL}`);
+      // Socket.IO seems to struggle with DO Apps platform, use simpler approach
+      const socketEndpoint = `${BACKEND_URL}/backend-temp`;
+      console.log(`Using socket endpoint: ${socketEndpoint}`);
       
-      socketRef.current = io(fullBackendURL, {
+      // Simplified connection options
+      socketRef.current = io(socketEndpoint, {
           reconnectionAttempts: 10,
           reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
           timeout: 20000,
-          transports: ['polling'], // Force polling only
-          path: socketIoPath,
-          forceNew: true,
-          reconnection: true
+          transports: ['polling'],
+          forceNew: true
       });
 
       const socket = socketRef.current;
