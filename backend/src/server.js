@@ -531,8 +531,7 @@ function handleSocketConnection(socket) {
     // TODO: Handle 'leaveRoom' event (optional explicit leave)
 
     // TODO: Handle 'setLanguage' event (optional)
-
-});
+}
 
 
 // Add a health check endpoint
