@@ -85,7 +85,7 @@ export default function GenerateQRScreen() {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-      transports: ['websocket', 'polling'], // Allow fallback to polling if websocket fails
+      transports: ['polling'], // Force polling since WebSockets appear to be blocked
       // Tell client to connect to this path
       path: socketIoPath,
     });
@@ -138,14 +138,18 @@ export default function GenerateQRScreen() {
       fetch(`${backendTarget}/health`)
         .then(response => {
           if (response.ok) {
-            console.log('HTTP connection works but WebSocket failed');
+            console.log('HTTP connection works but Socket.IO connection failed');
             return response.json();
           } else {
             console.error('HTTP connection also failed:', response.status);
             throw new Error(`HTTP status ${response.status}`);
           }
         })
-        .then(data => console.log('Health check response:', data))
+        .then(data => {
+          console.log('Health check response:', data);
+          // Show alternative error message for user
+          setError(`Failed to establish real-time connection. Using HTTP fallback would require changes to the app architecture.`);
+        })
         .catch(err => console.error('Health check failed:', err));
     });
     

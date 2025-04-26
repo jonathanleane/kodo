@@ -79,7 +79,7 @@ export default function JoinChatScreen() {
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
           timeout: 20000,
-          transports: ['websocket', 'polling'], // Allow fallback to polling if websocket fails
+          transports: ['polling'], // Force polling since WebSockets appear to be blocked
           path: socketIoPath,
       });
 

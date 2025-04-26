@@ -35,7 +35,8 @@ const io = new Server(server, {
     connectTimeout: 30000,
     pingTimeout: 60000,
     upgradeTimeout: 30000,
-    transports: ['websocket', 'polling']
+    transports: ['polling'], // Force polling since WebSockets appear to be blocked
+    allowUpgrades: false // Prevent transport upgrades to WebSocket
 });
 
 // --- OpenAI Setup ---
