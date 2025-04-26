@@ -74,12 +74,16 @@ export default function JoinChatScreen() {
 
       console.log(`Join screen: Connecting to ${BACKEND_URL} with path ${socketIoPath}`);
       
-      socketRef.current = io(BACKEND_URL, {
+      // Construct the full backend URL
+      const fullBackendURL = `${BACKEND_URL}/backend-temp`;
+      console.log(`Using fully qualified backend URL: ${fullBackendURL}`);
+      
+      socketRef.current = io(fullBackendURL, {
           reconnectionAttempts: 10,
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
           timeout: 20000,
-          transports: ['websocket', 'polling'], // Try both transports again with root domain
+          transports: ['polling'], // Force polling only
           path: socketIoPath,
           forceNew: true,
           reconnection: true

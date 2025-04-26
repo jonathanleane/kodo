@@ -108,9 +108,10 @@ let redisClient;
 app.use(express.json()); // Middleware to parse JSON bodies
 
 // --- Basic HTTP Routes ---
-app.get('/', (req, res) => {
-    res.send('Translation Chat Backend Running');
-});
+// Replaced by the JSON version below
+// app.get('/', (req, res) => {
+//     res.send('Translation Chat Backend Running');
+// });
 
 // Placeholder for QR Code Generation Route
 // TODO: Implement /generate-qr route
@@ -479,7 +480,14 @@ app.get('/health', (req, res) => {
         redis: redisClient && redisClient.isReady ? 'connected' : 'disconnected',
         socketio: io ? 'initialized' : 'not initialized',
     };
-    res.json(healthData);
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(healthData));
+});
+
+// Add root endpoint to avoid text response
+app.get('/', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify({ message: 'Translation Chat Backend Running' }));
 });
 
 // Add an API test endpoint 

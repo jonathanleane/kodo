@@ -80,13 +80,17 @@ export default function GenerateQRScreen() {
     // Log the connection attempt details
     console.log(`Attempting to connect to: ${backendTarget} with path: ${socketIoPath}`);
     
-    socketRef.current = io(backendTarget, {
+    // Construct the full backend URL
+    const fullBackendURL = `${backendTarget}/backend-temp`;
+    console.log(`Using fully qualified backend URL: ${fullBackendURL}`);
+    
+    // Try with explicit URL format
+    socketRef.current = io(fullBackendURL, {
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-      transports: ['websocket', 'polling'], // Try both transports again with root domain
-      // Tell client to connect to this path
+      transports: ['polling'], // Force polling only
       path: socketIoPath,
       forceNew: true,
       reconnection: true
