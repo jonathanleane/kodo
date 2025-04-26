@@ -4,10 +4,12 @@
   "description": "Real-Time Translation Chat App",
   "main": "index.js",
   "scripts": {
+    "start": "cd backend && npm start",
     "start:backend": "cd backend && npm start",
     "start:frontend": "cd frontend && npx expo start",
     "dev": "concurrently \"npm:start:backend\" \"npm:start:frontend\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "cd backend && npm install"
   },
   "keywords": [
     "chat",
