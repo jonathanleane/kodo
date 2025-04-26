@@ -6,10 +6,13 @@ buildCommand = "npm install && npx expo export"
 numReplicas = 1
 restartPolicyType = "always"
 sleepApplication = false
-startCommand = "./railway-run.sh"
+startCommand = "npm run serve"
+
+[nixpacks]
+installCommand = "npm install"
 
 [service]
 autoDeploy = true
 healthcheckPath = "/"
 healthcheckTimeout = 300
-port = "80"
+port = 8080
