@@ -503,8 +503,12 @@ app.get('/api/test', (req, res) => {
 });
 
 // --- Start Server ---
-server.listen(PORT, () => {
-    console.log(`Server listening on *:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server listening on 0.0.0.0:${PORT}`);
+    console.log(`Healthcheck at http://0.0.0.0:${PORT}/`);
+    
+    // Log when server is ready
+    console.log('Server is ready to accept connections');
 });
 
 // --- Graceful Shutdown ---
