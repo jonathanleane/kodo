@@ -148,39 +148,32 @@ app.use(express.json()); // Middleware to parse JSON bodies
 //     res.send('Translation Chat Backend Running');
 // });
 
-// Placeholder for QR Code Generation Route
-// TODO: Implement /generate-qr route
+// QR Code Generation Route - HTTP-based approach
 app.post('/generate-qr', async (req, res) => {
-    // 1. Generate unique token
-    // 2. Store token -> requesting user (socket ID initially) in Redis with TTL
-    // 3. Return token
-    console.log("Received /generate-qr request");
+    console.log("Received /generate-qr HTTP request");
 
-    // Get the socket ID from the request (important: needs to be passed from client)
-    // For now, we'll assume it might come in the body or headers.
-    // A better approach might be for the client to connect via WebSocket FIRST,
-    // then request the QR code via a WebSocket event, providing its socket.id.
-    // But sticking to the HLD's HTTP endpoint for now:
-    const requestingSocketId = req.body.socketId || req.headers['x-socket-id']; // Example ways to pass it
+    // Check if this is using the new HTTP-based flow
+    const useHttp = req.body.useHttp === true;
+    
+    // For HTTP-based flow, we don't need a socket ID, just store a placeholder
+    // We'll use a much longer TTL for HTTP-based flow
+    const requestingSocketId = req.body.socketId || req.headers['x-socket-id'] || 'http-generated';
 
-    if (!requestingSocketId) {
-        console.error("Error: Socket ID not provided in /generate-qr request.");
-        // In a real app, the client should establish a WebSocket connection *before* requesting a QR.
-        // The request should likely be a WS message, not HTTP.
-        // For now, let's proceed with a dummy ID for testing HTTP endpoint directly.
-        // return res.status(400).json({ error: "Socket ID is required to generate a QR code." });
-        console.warn("Warning: No socket ID provided. Generating QR token without linking to a specific user initially.");
-        // Allow generating the token but it won't be directly linked yet.
-    }
-
-    const token = crypto.randomBytes(16).toString('hex'); // Generate a secure random token
+    // Generate a secure random token
+    const token = crypto.randomBytes(16).toString('hex');
     const tokenKey = `qr_token:${token}`;
-    const tokenData = JSON.stringify({ requestingUserId: requestingSocketId || 'unknown', createdAt: Date.now() });
-    const ttlInSeconds = 60; // Token valid for 60 seconds
+    const tokenData = JSON.stringify({ 
+        requestingUserId: requestingSocketId,
+        createdAt: Date.now(),
+        useHttp: useHttp
+    });
+    
+    // Use a much longer TTL for HTTP-generated tokens (10 minutes)
+    const ttlInSeconds = useHttp ? 600 : 120;
 
     try {
         await redisClient.set(tokenKey, tokenData, { EX: ttlInSeconds });
-        console.log(`Stored token ${token} for user ${requestingSocketId || 'unknown'} with TTL ${ttlInSeconds}s`);
+        console.log(`Stored token ${token} with TTL ${ttlInSeconds}s (HTTP flow: ${useHttp})`);
         res.json({ token: token });
     } catch (err) {
         console.error("Redis error storing token:", err);
@@ -250,21 +243,60 @@ function handleSocketConnection(socket) {
             const tokenData = JSON.parse(tokenDataString);
             const userA_SocketId = tokenData.requestingUserId;
             const clientB_SocketId = socket.id;
+            const isHttpGenerated = tokenData.useHttp === true;
 
-            console.log(`Token valid. Found User A socket ID: ${userA_SocketId}`);
+            console.log(`Token valid. Found User A socket ID: ${userA_SocketId}, HTTP-generated: ${isHttpGenerated}`);
 
-            // Check if User A is still connected (tricky if they requested via HTTP)
-            // Ideally User A is already connected via WebSocket.
+            // Check if User A is still connected
             const userASocket = io.sockets.sockets.get(userA_SocketId);
+            
             if (!userASocket) {
-                 // This handles the case where the original requester disconnected
-                 // or if the ID stored was 'unknown' because they used HTTP without identifying.
-                console.log(`Original user ${userA_SocketId} not found or disconnected.`);
-                 // We could potentially still store the room info and wait for User A to connect/reconnect
-                 // but for simplicity now, we'll reject the join.
-                socket.emit('error', { message: 'The user who generated the code is not available.' });
-                 await redisClient.del(tokenKey); // Clean up token
-                return;
+                // For HTTP-generated tokens without a connected User A,
+                // we'll emit a special event so others can pick it up
+                if (isHttpGenerated || userA_SocketId === 'http-generated') {
+                    console.log(`Token was HTTP-generated and no socket is connected yet. Broadcasting token join.`);
+                    
+                    // Create a room anyway
+                    const roomId = `room_${crypto.randomBytes(8).toString('hex')}`;
+                    console.log(`Creating room ${roomId} for future connection with ${clientB_SocketId}`);
+                    
+                    // Store room info in Redis with the token as part of the key
+                    const roomKey = `room:${roomId}`;
+                    const userB_Language = language;
+                    
+                    const roomData = JSON.stringify({
+                        token: token,
+                        userB: { socketId: clientB_SocketId, language: userB_Language },
+                        pendingUserA: true
+                    });
+                    
+                    // Store the room data with a longer TTL (10 minutes)
+                    await redisClient.set(roomKey, roomData, { EX: 600 });
+                    console.log(`Created pending room ${roomId} for token ${token}`);
+                    
+                    // Store B's socket ID -> roomId mapping
+                    const userBKey = `user_socket:${clientB_SocketId}`;
+                    await redisClient.set(userBKey, roomId);
+                    
+                    // Add socket B to the room
+                    socket.join(roomId);
+                    console.log(`Socket ${clientB_SocketId} joined room ${roomId}`);
+                    
+                    // Emit event to user B
+                    socket.emit('waitingForHost', { 
+                        token: token, 
+                        message: 'Waiting for the host to connect...' 
+                    });
+                    
+                    // Keep the token so A can join when they connect
+                    return;
+                } else {
+                    // Non-HTTP case where User A disconnected
+                    console.log(`Original user ${userA_SocketId} not found or disconnected.`);
+                    socket.emit('error', { message: 'The user who generated the code is not available.' });
+                    await redisClient.del(tokenKey); 
+                    return;
+                }
             }
 
             // 3. Create room ID
@@ -326,7 +358,7 @@ function handleSocketConnection(socket) {
         const token = crypto.randomBytes(16).toString('hex');
         const tokenKey = `qr_token:${token}`;
         const tokenData = JSON.stringify({ requestingUserId: socket.id, createdAt: Date.now() });
-        const ttlInSeconds = 120;
+        const ttlInSeconds = 300; // 5 minutes
 
         try {
             console.log(`[Redis SET ${tokenKey}] Attempting...`);
@@ -336,6 +368,28 @@ function handleSocketConnection(socket) {
         } catch (err) {
             console.error(`[Redis SET ${tokenKey}] Error storing token for generateToken event:`, err);
             socket.emit('error', { message: "Failed to generate QR token due to server error." });
+        }
+    });
+    
+    // Register to listen for a specific token (for HTTP-generated tokens)
+    socket.on('listenForToken', async ({ token }) => {
+        console.log(`Socket ${socket.id} is now listening for token: ${token}`);
+        try {
+            // Update the token data to include this socket
+            const tokenKey = `qr_token:${token}`;
+            const existingData = await redisClient.get(tokenKey);
+            
+            if (existingData) {
+                const parsedData = JSON.parse(existingData);
+                parsedData.requestingUserId = socket.id;
+                await redisClient.set(tokenKey, JSON.stringify(parsedData), { EX: 600 });
+                console.log(`Updated token ${token} to use socket ${socket.id} with TTL 600s`);
+            } else {
+                console.log(`Token ${token} not found when socket ${socket.id} tried to listen for it`);
+                socket.emit('error', { message: "Token not found or expired" });
+            }
+        } catch (err) {
+            console.error(`Error updating token for listenForToken event:`, err);
         }
     });
 
