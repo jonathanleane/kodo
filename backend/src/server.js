@@ -60,15 +60,43 @@ let redisClient;
       socket: {
           tls: true,
           rejectUnauthorized: false // Necessary for some DO Redis configs, consider security implications
+      },
+      // Add reconnect strategy
+      retry_strategy: function(options) {
+          if (options.error && options.error.code === 'ECONNREFUSED') {
+              // End reconnecting on a specific error and flush all commands with a individual error
+              return new Error('The server refused the connection');
+          }
+          if (options.total_retry_time > 1000 * 60 * 60) {
+              // End reconnecting after a specific timeout and flush all commands with a individual error
+              return new Error('Retry time exhausted');
+          }
+          if (options.attempt > 10) {
+              // End reconnecting with built in error
+              return undefined;
+          }
+          // reconnect after
+          return Math.min(options.attempt * 100, 3000);
       }
     });
-    redisClient.on('error', (err) => console.error('Redis Client Error:', err));
+    
+    // Set up error handling with reconnect logic
+    redisClient.on('error', (err) => {
+      console.error('Redis Client Error:', err);
+      // Don't exit on redis errors, try to reconnect instead
+    });
+    
+    redisClient.on('reconnecting', () => {
+      console.log('Attempting to reconnect to Redis...');
+    });
+    
     await redisClient.connect();
     console.log('Connected to Redis');
   } catch (err) {
     console.error('Failed to connect to Redis:', err);
-    // Exit if Redis connection fails, as it's critical
-    process.exit(1);
+    // Don't exit on initial connection failure - continue without Redis
+    // The server will attempt to handle operations gracefully without Redis
+    console.log('Server will continue without Redis - chat functionality will be limited');
   }
 })();
 
@@ -130,6 +158,9 @@ io.on('connection', (socket) => {
     console.log(`Connection URL: ${socket.handshake.url}, Query: ${JSON.stringify(socket.handshake.query)}`);
     console.log(`Socket.IO path: ${socketIoPath}`);
 
+    // Send immediate acknowledgment to client
+    socket.emit('server_ack', { status: 'connected', socketId: socket.id });
+    
     console.log(`User connected: ${socket.id}`);
 
     // TODO: Handle 'join' event from Scanner (Client B)
@@ -436,6 +467,22 @@ io.on('connection', (socket) => {
 
 });
 
+
+// Add a health check endpoint
+app.get('/health', (req, res) => {
+    const healthData = {
+        uptime: process.uptime(),
+        timestamp: Date.now(),
+        redis: redisClient && redisClient.isReady ? 'connected' : 'disconnected',
+        socketio: io ? 'initialized' : 'not initialized',
+    };
+    res.json(healthData);
+});
+
+// Add an API test endpoint 
+app.get('/api/test', (req, res) => {
+    res.json({ message: 'API routes are working correctly' });
+});
 
 // --- Start Server ---
 server.listen(PORT, () => {

@@ -77,8 +77,14 @@ export default function GenerateQRScreen() {
     console.log('Attempting to connect to backend...');
     const backendTarget = BACKEND_URL;
 
+    // Log the connection attempt details
+    console.log(`Attempting to connect to: ${backendTarget} with path: ${socketIoPath}`);
+    
     socketRef.current = io(backendTarget, {
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      timeout: 20000,
       transports: ['websocket', 'polling'], // Allow fallback to polling if websocket fails
       // Tell client to connect to this path
       path: socketIoPath,
@@ -124,8 +130,28 @@ export default function GenerateQRScreen() {
 
     socket.on('connect_error', (err: Error) => {
       console.error('Connection Error:', err.message);
+      console.error('Connection Error details:', err);
       setError(`Failed to connect to server: ${err.message}. Make sure the backend is running at ${backendTarget}.`);
       setStatus('Connection Failed');
+      
+      // Try a direct fetch to test the HTTP connection
+      fetch(`${backendTarget}/health`)
+        .then(response => {
+          if (response.ok) {
+            console.log('HTTP connection works but WebSocket failed');
+            return response.json();
+          } else {
+            console.error('HTTP connection also failed:', response.status);
+            throw new Error(`HTTP status ${response.status}`);
+          }
+        })
+        .then(data => console.log('Health check response:', data))
+        .catch(err => console.error('Health check failed:', err));
+    });
+    
+    // Add listener for server acknowledgment
+    socket.on('server_ack', (data) => {
+      console.log('Received server acknowledgment:', data);
     });
 
     socket.on('disconnect', (reason: Socket.DisconnectReason) => {
