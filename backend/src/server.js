@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require("socket.io");
+const cors = require('cors');
 const redis = require('redis'); // Uncomment when Redis is configured
 const { OpenAI } = require('openai');
 const crypto = require('crypto'); // Add crypto for token generation
@@ -23,36 +24,40 @@ if (!OPENAI_API_KEY) {
 }
 
 const app = express();
-const server = http.createServer(app);
 
-// Define the path for Socket.IO (including the ingress prefix)
-const socketIoPath = "/socket.io"; // Use standard path
+// Configure CORS properly using the cors package
+const corsOptions = {
+  origin: '*', // Allow all origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Socket-ID'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
 
-// Move CORS middleware definition to before the Socket.IO initialization
-app.use(function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "X-Requested-With");
-  res.header("Access-Control-Allow-Headers", "Content-Type");
-  res.header("Access-Control-Allow-Methods", "PUT, GET, POST, DELETE, OPTIONS");
-  next();
-});
+// Apply CORS middleware to all routes
+app.use(cors(corsOptions));
 
-// Disable body parser limit for socket.io
+// Body parsers
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Initialize Socket.IO with simpler configuration
+// Create HTTP server
+const server = http.createServer(app);
+
+// Socket.IO configuration
 const io = new Server(server, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        credentials: true
+        origin: '*',
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        credentials: true,
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
     },
     connectTimeout: 60000,
-    pingTimeout: 25000,
-    upgradeTimeout: 30000,
-    maxHttpBufferSize: 1e8,
-    transports: ['polling', 'websocket']
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['polling', 'websocket'],
+    allowEIO3: true // For backward compatibility
 });
 
 // --- OpenAI Setup ---
@@ -184,14 +189,27 @@ app.post('/generate-qr', async (req, res) => {
 });
 
 
+// Log available namespaces
+console.log('Setting up Socket.IO namespaces');
+
 // Create a namespace for /backend-temp for compatibility with DigitalOcean
 const backendNamespace = io.of('/backend-temp');
+console.log('Created /backend-temp namespace');
+
+// Set up CORS for the namespace as well
+backendNamespace.use((socket, next) => {
+    // Log the connection request
+    console.log(`Namespace connection request from origin: ${socket.handshake.headers.origin}`);
+    next();
+});
 
 // Main Socket.IO connection handler
 io.on('connection', handleSocketConnection);
+console.log('Set up handlers for default namespace');
 
 // Backend-temp namespace connection handler (same handlers)
 backendNamespace.on('connection', handleSocketConnection);
+console.log('Set up handlers for /backend-temp namespace');
 
 // --- WebSocket Event Handling ---
 function handleSocketConnection(socket) {
@@ -541,20 +559,7 @@ app.get('/backend-temp', (req, res) => {
     res.send(JSON.stringify({ message: 'Translation Chat Backend Running (backend-temp path)' }));
 });
 
-// Add CORS middleware for all routes (must be before other middleware)
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
-    next();
-});
+// CORS middleware already applied at the top of the file
 
 // Add an API test endpoint 
 app.get('/api/test', (req, res) => {

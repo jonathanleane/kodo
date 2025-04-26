@@ -81,18 +81,21 @@ export default function GenerateQRScreen() {
     // Log the connection attempt details
     console.log(`Attempting to connect to: ${backendTarget} with path: ${socketIoPath}`);
     
-    // Socket.IO seems to struggle with DO Apps platform, let's try a simpler approach
-    // with direct backend endpoint 
-    const socketEndpoint = `${backendTarget}/backend-temp`;
-    console.log(`Using socket endpoint: ${socketEndpoint}`);
+    // Connect directly to the backend-temp namespace
+    const namespace = 'backend-temp';
+    console.log(`Using namespace: ${namespace}`);
     
-    // Simplified connection options
-    socketRef.current = io(socketEndpoint, {
+    // Create Socket.IO connection
+    socketRef.current = io(`${backendTarget}/${namespace}`, {
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       timeout: 20000,
-      transports: ['polling'],
-      forceNew: true
+      transports: ['polling', 'websocket'],
+      path: '/socket.io', // Explicit path
+      forceNew: true,
+      autoConnect: true,
+      withCredentials: false
     });
 
     const socket = socketRef.current;
