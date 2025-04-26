@@ -2,10 +2,6 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "cd backend && npm install && node src/server.js"
-healthcheckPath = "/"
-healthcheckTimeout = 180
+startCommand = "cd backend && npm install express && node src/minimal-server.js"
+healthcheckEnabled = false
 restartPolicyType = "always"
-
-[nixpacks]
-nodejs = "18"
