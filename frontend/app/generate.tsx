@@ -23,15 +23,16 @@ import { DefaultEventsMap } from '@socket.io/component-emitter';
 //   generateToken: () => void;
 // }
 
-// TODO: Replace with your actual backend URL if deployed
-// const BACKEND_URL = 'http://localhost:3001'; // Default for local dev
-// const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Old DigitalOcean URL
-const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway deployment URL
+// Backend URL configuration
+// const BACKEND_URL = 'http://localhost:3001'; // Local development
+// const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // DigitalOcean (legacy)
+const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway backend
 // Base URL for the web app itself (for the QR code link)
 // For mobile testing on local network, this needs to be IP address
 // For web testing, localhost:8081 works
 // For deployment, this would be your actual domain
 const WEB_APP_PORT = 8081; // Default Expo web port
+const FRONTEND_URL = 'https://kodo-production-48f9.up.railway.app'; // Railway frontend URL
 
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
@@ -48,9 +49,16 @@ export default function GenerateQRScreen() {
   const [webAppBaseUrl, setWebAppBaseUrl] = useState<string | null>(`http://localhost:${WEB_APP_PORT}`);
   const navigation = useNavigation(); // Use navigation hook if needed for header etc.
 
-  // Get local IP address for QR code generation if not on web
+  // Configure the URL for QR code generation
   useEffect(() => {
-    if (Platform.OS !== 'web') {
+    // On deployed production environment, use the Railway frontend URL
+    const isProduction = window.location.hostname.includes('railway.app');
+    
+    if (isProduction) {
+      console.log("Using production frontend URL for QR code");
+      setWebAppBaseUrl(FRONTEND_URL);
+    } else if (Platform.OS !== 'web') {
+      // For mobile development, use device IP
       Network.getIpAddressAsync().then((ipAddress: string) => {
         console.log("Device IP Address:", ipAddress);
         setWebAppBaseUrl(`http://${ipAddress}:${WEB_APP_PORT}`);
@@ -60,12 +68,10 @@ export default function GenerateQRScreen() {
         setStatus("Error");
       });
     } else {
-      // Ensure webAppBaseUrl is set even for web platform if not already
-       if (!webAppBaseUrl) {
-            setWebAppBaseUrl(`http://localhost:${WEB_APP_PORT}`);
-        }
+      // For local web development
+      setWebAppBaseUrl(`http://localhost:${WEB_APP_PORT}`);
     }
-  }, [webAppBaseUrl]); // Add webAppBaseUrl dependency
+  }, []); // No dependencies needed
 
 
   useEffect(() => {

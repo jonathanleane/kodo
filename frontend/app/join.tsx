@@ -17,10 +17,10 @@ import io, { Socket } from 'socket.io-client';
 import { DefaultEventsMap } from '@socket.io/component-emitter';
 import { Button as PaperButton } from 'react-native-paper';
 
-// TODO: Replace with your actual backend URL if deployed
-// const BACKEND_URL = 'http://localhost:3001'; // Default for local dev
-// const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Old DigitalOcean URL
-const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway deployment URL
+// Backend URL configuration
+// const BACKEND_URL = 'http://localhost:3001'; // Local development
+// const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // DigitalOcean (legacy)
+const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway backend
 
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
