@@ -35,8 +35,10 @@ const io = new Server(server, {
     connectTimeout: 30000,
     pingTimeout: 60000,
     upgradeTimeout: 30000,
-    transports: ['polling'], // Force polling since WebSockets appear to be blocked
-    allowUpgrades: false // Prevent transport upgrades to WebSocket
+    transports: ['websocket', 'polling'], // Try both transports
+    perMessageDeflate: false, // Disable WebSocket compression
+    maxHttpBufferSize: 1e8, // Increase buffer size
+    httpCompression: false // Disable HTTP compression
 });
 
 // --- OpenAI Setup ---

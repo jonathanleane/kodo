@@ -19,7 +19,7 @@ import { Button as PaperButton } from 'react-native-paper';
 
 // TODO: Replace with your actual backend URL if deployed
 // const BACKEND_URL = 'http://localhost:3001'; // Default for local dev
-const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app/backend-temp'; // Try using the explicitly routed backend URL
+const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Use the root domain for WebSocket connections
 
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
@@ -79,8 +79,10 @@ export default function JoinChatScreen() {
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
           timeout: 20000,
-          transports: ['polling'], // Force polling since WebSockets appear to be blocked
+          transports: ['websocket', 'polling'], // Try both transports again with root domain
           path: socketIoPath,
+          forceNew: true,
+          reconnection: true
       });
 
       const socket = socketRef.current;

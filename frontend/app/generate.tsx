@@ -25,7 +25,7 @@ import { DefaultEventsMap } from '@socket.io/component-emitter';
 
 // TODO: Replace with your actual backend URL if deployed
 // const BACKEND_URL = 'http://localhost:3001'; // Default for local dev
-const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app/backend-temp'; // Try using the explicitly routed backend URL
+const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Use the root domain for WebSocket connections
 // Base URL for the web app itself (for the QR code link)
 // For mobile testing on local network, this needs to be IP address
 // For web testing, localhost:8081 works
@@ -85,9 +85,11 @@ export default function GenerateQRScreen() {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 20000,
-      transports: ['polling'], // Force polling since WebSockets appear to be blocked
+      transports: ['websocket', 'polling'], // Try both transports again with root domain
       // Tell client to connect to this path
       path: socketIoPath,
+      forceNew: true,
+      reconnection: true
     });
 
     const socket = socketRef.current;
