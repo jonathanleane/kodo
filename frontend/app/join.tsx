@@ -130,6 +130,7 @@ export default function JoinChatScreen() {
           }, 30000);
       });
 
+      // Handle successful room join
       socket.on('joinedRoom', ({ roomId: receivedRoomId, partnerLanguage: receivedPartnerLang }: { roomId: string, partnerLanguage: string }) => {
           console.log(`Join screen: Successfully joined room ${receivedRoomId}`);
           setRoomId(receivedRoomId);
@@ -137,6 +138,18 @@ export default function JoinChatScreen() {
           setConnectStatus('joined');
           setError(null);
           // Now the main chat useEffect listener will take over
+      });
+      
+      // Handle the waitingForHost state (new for HTTP-generated tokens)
+      socket.on('waitingForHost', ({ token, message }) => {
+          console.log(`Join screen: Waiting for host with token ${token}`);
+          setStatus(`Waiting for host to connect...`);
+          
+          // Show a special waiting status but don't change connectStatus yet
+          // so the retry mechanism continues
+          setError(null);
+          
+          // We could optionally show a countdown or loading indicator here
       });
 
       socket.on('error', (errorMessage: { message: string }) => {
@@ -292,7 +305,12 @@ export default function JoinChatScreen() {
     return (
         <View style={styles.centerStatus}>
             <ActivityIndicator size="large" />
-            <Text style={styles.statusText}>Connecting and joining room...</Text>
+            <Text style={styles.statusText}>{status || 'Connecting and joining room...'}</Text>
+            {status && status.includes('Waiting for host') && (
+                <Text style={styles.waitingText}>
+                    Please keep this screen open while waiting for the chat host to connect
+                </Text>
+            )}
         </View>
     );
   }
@@ -366,6 +384,14 @@ const styles = StyleSheet.create({
   statusText: {
       marginTop: 15,
       fontSize: 16,
+      marginBottom: 10,
+  },
+  waitingText: {
+      fontSize: 14,
+      color: '#666',
+      textAlign: 'center',
+      marginTop: 10,
+      marginHorizontal: 20,
   },
   errorText: {
     fontSize: 18,
