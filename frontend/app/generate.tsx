@@ -112,9 +112,7 @@ export default function GenerateQRScreen() {
       path: '/socket.io',
       forceNew: true,
       autoConnect: true,
-      withCredentials: false,
-      pingInterval: 10000,
-      pingTimeout: 20000
+      withCredentials: false
     });
 
     const socket = socketRef.current;
@@ -122,10 +120,8 @@ export default function GenerateQRScreen() {
     socket.on('connect', () => {
       console.log('Connected to backend with socket ID:', socket.id);
       // Explicitly emit listenForToken with the generated token
-      setTimeout(() => {
-        console.log('Emitting listenForToken event for token:', token);
-        socket.emit('listenForToken', { token: token });
-      }, 1000); // Add a small delay to ensure connection is stable
+      console.log('Emitting listenForToken event for token:', token);
+      socket.emit('listenForToken', { token: token });
     });
     
     // Add event listener for room joining
