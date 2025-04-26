@@ -6,7 +6,7 @@ buildCommand = "npm install && npx expo export"
 numReplicas = 1
 restartPolicyType = "always"
 sleepApplication = false
-startCommand = "npx serve -s dist -l 3000"
+startCommand = "npx serve -s dist -l 8081"
 
 [nixpacks]
 installCommand = "npm install"
@@ -15,4 +15,4 @@ installCommand = "npm install"
 autoDeploy = true
 healthcheckPath = "/"
 healthcheckTimeout = 300
-port = 3000
+port = 8081
