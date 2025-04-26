@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npx expo export && echo 'Cache busted'"
+buildCommand = "npm install && npx expo export"
 
 [deploy]
 numReplicas = 1
