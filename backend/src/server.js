@@ -43,9 +43,19 @@ const io = new Server(server, {
 });
 
 // --- OpenAI Setup ---
-const openai = new OpenAI({
-    apiKey: OPENAI_API_KEY,
-});
+let openai = null;
+try {
+    if (OPENAI_API_KEY) {
+        openai = new OpenAI({
+            apiKey: OPENAI_API_KEY,
+        });
+        console.log('OpenAI client initialized successfully');
+    } else {
+        console.log('OpenAI client not initialized (no API key)');
+    }
+} catch (error) {
+    console.error('Failed to initialize OpenAI client:', error.message);
+}
 
 // --- Redis Client Setup ---
 let redisClient;
@@ -340,6 +350,10 @@ io.on('connection', (socket) => {
                     const prompt = `Translate the following text from ${senderLang} to ${targetLang}. Output only the translated text, without any additional explanation or introduction.`;
                     console.log(`Sending to OpenAI: Model=${process.env.OPENAI_MODEL || 'gpt-4o'}, Prompt="${prompt}", Text="${messageText}"`);
 
+                    if (!openai) {
+                        throw new Error('OpenAI client not initialized - check API key');
+                    }
+                    
                     const completion = await openai.chat.completions.create({
                         model: process.env.OPENAI_MODEL || "gpt-4o", // Use env variable or default
                         messages: [
