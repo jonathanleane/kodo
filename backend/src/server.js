@@ -283,10 +283,16 @@ function handleSocketConnection(socket) {
                     console.log(`Socket ${clientB_SocketId} joined room ${roomId}`);
                     
                     // Emit event to user B
-                    socket.emit('waitingForHost', { 
+                    const waitingMessage = { 
                         token: token, 
-                        message: 'Waiting for the host to connect...' 
-                    });
+                        message: 'Waiting for the host to connect...',
+                        roomId: roomId
+                    };
+                    console.log(`Emitting waitingForHost to ${clientB_SocketId}:`, JSON.stringify(waitingMessage));
+                    socket.emit('waitingForHost', waitingMessage);
+                    
+                    // Also broadcast to the room for good measure
+                    io.to(roomId).emit('waitingForHost', waitingMessage);
                     
                     // Keep the token so A can join when they connect
                     return;
@@ -384,12 +390,84 @@ function handleSocketConnection(socket) {
                 parsedData.requestingUserId = socket.id;
                 await redisClient.set(tokenKey, JSON.stringify(parsedData), { EX: 600 });
                 console.log(`Updated token ${token} to use socket ${socket.id} with TTL 600s`);
+                
+                // Check if there are any pending rooms for this token
+                // This is the key part - we need to find if anyone has already joined with this token
+                console.log(`Checking if any clients are waiting with token ${token}...`);
+                const roomKeys = await redisClient.keys('room:*');
+                
+                for (const roomKey of roomKeys) {
+                    const roomData = await redisClient.get(roomKey);
+                    if (roomData) {
+                        const parsedRoomData = JSON.parse(roomData);
+                        
+                        if (parsedRoomData.token === token && parsedRoomData.pendingUserA) {
+                            console.log(`Found pending room ${roomKey} for token ${token}, completing connection!`);
+                            
+                            // Extract room ID from key (remove 'room:' prefix)
+                            const roomId = roomKey.replace('room:', '');
+                            
+                            // Add host socket to room
+                            socket.join(roomId);
+                            
+                            // Get client B info
+                            const userB = parsedRoomData.userB;
+                            const userB_SocketId = userB.socketId;
+                            const userB_Language = userB.language;
+                            
+                            // Update room data to include host info
+                            parsedRoomData.pendingUserA = false;
+                            parsedRoomData.userA = {
+                                socketId: socket.id,
+                                language: 'en' // Default language for host
+                            };
+                            
+                            // Save updated room data
+                            await redisClient.set(roomKey, JSON.stringify(parsedRoomData), { EX: 600 });
+                            
+                            // Store socketId -> roomId mapping for the host
+                            const userAKey = `user_socket:${socket.id}`;
+                            await redisClient.set(userAKey, roomId);
+                            
+                            // Emit joinedRoom events to both sockets
+                            const clientBSocket = io.sockets.sockets.get(userB_SocketId);
+                            
+                            if (clientBSocket) {
+                                console.log(`Notifying client ${userB_SocketId} that host has connected`);
+                                clientBSocket.emit('joinedRoom', {
+                                    roomId: roomId,
+                                    partnerLanguage: 'en' // Default language for host
+                                });
+                            }
+                            
+                            // Also notify the host
+                            socket.emit('joinedRoom', {
+                                roomId: roomId,
+                                partnerLanguage: userB_Language
+                            });
+                            
+                            break; // Stop after finding the first matching room
+                        }
+                    }
+                }
             } else {
                 console.log(`Token ${token} not found when socket ${socket.id} tried to listen for it`);
                 socket.emit('error', { message: "Token not found or expired" });
             }
         } catch (err) {
             console.error(`Error updating token for listenForToken event:`, err);
+        }
+    });
+    
+    // Check if host has connected
+    socket.on('checkHostStatus', async ({ token }) => {
+        try {
+            // This event allows clients to periodically check if the host has connected
+            // No action needed here as the listenForToken handler above already handles this
+            // Just log the request for debugging
+            console.log(`Socket ${socket.id} checking host status for token: ${token}`);
+        } catch (err) {
+            console.error(`Error in checkHostStatus:`, err);
         }
     });
 

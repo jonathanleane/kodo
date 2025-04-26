@@ -141,15 +141,32 @@ export default function JoinChatScreen() {
       });
       
       // Handle the waitingForHost state (new for HTTP-generated tokens)
-      socket.on('waitingForHost', ({ token, message }) => {
-          console.log(`Join screen: Waiting for host with token ${token}`);
+      socket.on('waitingForHost', (data) => {
+          console.log(`Join screen: Waiting for host event received:`, data);
           setStatus(`Waiting for host to connect...`);
           
-          // Show a special waiting status but don't change connectStatus yet
-          // so the retry mechanism continues
+          // Show a special waiting status
+          // Important: Also set a temporary connect status to stop the retry mechanism
+          setConnectStatus('waiting');
           setError(null);
           
-          // We could optionally show a countdown or loading indicator here
+          // Log the full data for debugging
+          console.log('waitingForHost full data:', JSON.stringify(data));
+          
+          // But continue checking if host connects every 5 seconds
+          const hostCheckInterval = setInterval(() => {
+              console.log(`Checking if host has connected for token...`);
+              socket.emit('checkHostStatus', { token: token });
+          }, 5000);
+          
+          // Clean up interval after 5 minutes
+          setTimeout(() => {
+              clearInterval(hostCheckInterval);
+              if (connectStatus === 'waiting') {
+                  setError('Host did not connect within the time limit. Please try again.');
+                  setConnectStatus('error');
+              }
+          }, 300000); // 5 minutes
       });
 
       socket.on('error', (errorMessage: { message: string }) => {
@@ -301,16 +318,16 @@ export default function JoinChatScreen() {
   }, [inputText, roomId, partnerLeft]);
 
   // --- Render Logic ---
-  if (connectStatus === 'connecting' || (token && !joined && connectStatus === 'idle')) {
+  if (connectStatus === 'connecting' || connectStatus === 'waiting' || (token && !joined && connectStatus === 'idle')) {
     return (
         <View style={styles.centerStatus}>
             <ActivityIndicator size="large" />
             <Text style={styles.statusText}>{status || 'Connecting and joining room...'}</Text>
-            {status && status.includes('Waiting for host') && (
+            {(status && status.includes('Waiting for host')) || connectStatus === 'waiting' ? (
                 <Text style={styles.waitingText}>
                     Please keep this screen open while waiting for the chat host to connect
                 </Text>
-            )}
+            ) : null}
         </View>
     );
   }
