@@ -38,3 +38,11 @@ lerna-debug.log*
 .npm
 .yarn-integrity
 .pnp.*
+
+# Expo web build output
+frontend/dist/
+
+# Deployment configs (if not intended to be committed)
+# app.yaml 
+# digitalocean_app_spec.txt
+# railway.toml # Keep this one usually

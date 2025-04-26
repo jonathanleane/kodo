@@ -19,7 +19,7 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 // const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // DigitalOcean (legacy)
 const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway backend
 // Base URL for the web app itself (for the QR code link)
-const FRONTEND_URL = 'https://zonal-benevolence-production.up.railway.app'; // Updated Railway frontend URL
+const FRONTEND_URL = 'https://zonal-benevolence-production.up.railway.app'; // Confirmed correct frontend URL
 
 // Define the path for Socket.IO (standard path)
 // const socketIoPath = "/socket.io"; // Managed by context
