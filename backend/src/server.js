@@ -28,18 +28,31 @@ const server = http.createServer(app);
 // Define the path for Socket.IO (including the ingress prefix)
 const socketIoPath = "/socket.io"; // Use standard path
 
+// Move CORS middleware definition to before the Socket.IO initialization
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "X-Requested-With");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "PUT, GET, POST, DELETE, OPTIONS");
+  next();
+});
+
+// Disable body parser limit for socket.io
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Initialize Socket.IO with simpler configuration
 const io = new Server(server, {
-    path: socketIoPath, // Explicitly set to /socket.io
     cors: {
-        origin: "*", // Allow all origins
-        methods: ["GET", "POST"],
+        origin: "*",
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         credentials: true
     },
-    // Enhanced options for better connectivity
     connectTimeout: 60000,
-    pingTimeout: 60000,
-    transports: ['websocket', 'polling'], // Enable both transport types
-    allowUpgrades: true
+    pingTimeout: 25000,
+    upgradeTimeout: 30000,
+    maxHttpBufferSize: 1e8,
+    transports: ['polling', 'websocket']
 });
 
 // --- OpenAI Setup ---
@@ -171,20 +184,31 @@ app.post('/generate-qr', async (req, res) => {
 });
 
 
+// Create a namespace for /backend-temp for compatibility with DigitalOcean
+const backendNamespace = io.of('/backend-temp');
+
+// Main Socket.IO connection handler
+io.on('connection', handleSocketConnection);
+
+// Backend-temp namespace connection handler (same handlers)
+backendNamespace.on('connection', handleSocketConnection);
+
 // --- WebSocket Event Handling ---
-io.on('connection', (socket) => {
+function handleSocketConnection(socket) {
     console.log(`Connection received! Socket ID: ${socket.id}, Transport: ${socket.conn.transport.name}`);
     // Log additional connection details for debugging
     console.log(`Connection details - Handshake: ${JSON.stringify(socket.handshake.headers, null, 2)}`);
+    console.log(`Connection namespace: ${socket.nsp.name}`);
     console.log(`Connection URL: ${socket.handshake.url}, Query: ${JSON.stringify(socket.handshake.query)}`);
-    console.log(`Socket.IO path: ${socketIoPath}`);
 
     // Send immediate acknowledgment to client
     socket.emit('server_ack', { status: 'connected', socketId: socket.id });
     
     console.log(`User connected: ${socket.id}`);
 
-    // TODO: Handle 'join' event from Scanner (Client B)
+    // ========== SOCKET EVENT HANDLERS ==========
+    
+    // Handle 'join' event from Scanner (Client B)
     socket.on('join', async ({ token, language }) => {
         console.log(`Join attempt received from ${socket.id} (Client B) with token: ${token}, language: ${language}`);
         const tokenKey = `qr_token:${token}`;
@@ -517,10 +541,18 @@ app.get('/backend-temp', (req, res) => {
     res.send(JSON.stringify({ message: 'Translation Chat Backend Running (backend-temp path)' }));
 });
 
-// Add CORS middleware for all routes
+// Add CORS middleware for all routes (must be before other middleware)
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+    
     next();
 });
 
