@@ -25,8 +25,8 @@ const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway deploym
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
 
-// Define the path for Socket.IO (must match server and ingress)
-const socketIoPath = "/socket.io"; // Use standard path instead of /api prefix for testing
+// Define the path for Socket.IO (standard path)
+const socketIoPath = "/socket.io";
 
 // --- Message Bubble Component ---
 const MessageBubble = ({ message }: { message: any }) => {
