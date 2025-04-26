@@ -81,15 +81,17 @@ export default function JoinChatScreen() {
       
       // Create Socket.IO connection with explicit namespace
       socketRef.current = io(`${BACKEND_URL}/${namespace}`, {
-          reconnectionAttempts: 10,
+          reconnectionAttempts: 30,         // More reconnection attempts
           reconnectionDelay: 1000,
           reconnectionDelayMax: 5000,
-          timeout: 20000,
+          timeout: 30000,                   // Longer timeout
           transports: ['polling', 'websocket'],
-          path: '/socket.io', // Explicit path
+          path: '/socket.io',               // Explicit path
           forceNew: true,
           autoConnect: true,
-          withCredentials: false
+          withCredentials: false,
+          pingInterval: 10000,              // More frequent pings to keep connection alive
+          pingTimeout: 20000                // Longer ping timeout
       });
 
       const socket = socketRef.current;
@@ -105,7 +107,27 @@ export default function JoinChatScreen() {
           clearTimeout(connectionTimeout);
           console.log('Join screen: Connected with socket ID:', socket.id);
           console.log(`Join screen: Emitting join event with token ${token} and lang ${userBLanguage}`);
-          socket.emit('join', { token: token, language: userBLanguage });
+          
+          // Add a slight delay before sending join event to ensure connection is stable
+          setTimeout(() => {
+              console.log(`Join screen: Now emitting delayed join event for token ${token}`);
+              socket.emit('join', { token: token, language: userBLanguage });
+          }, 1000);
+          
+          // Add a periodic reattempt to join if no response
+          const retryJoinInterval = setInterval(() => {
+              if (connectStatus === 'connecting') {
+                  console.log(`Join screen: Re-attempting join with token ${token}`);
+                  socket.emit('join', { token: token, language: userBLanguage });
+              } else {
+                  clearInterval(retryJoinInterval);
+              }
+          }, 5000); // Retry every 5 seconds
+          
+          // Clear the retry interval after 30 seconds max (6 attempts)
+          setTimeout(() => {
+              clearInterval(retryJoinInterval);
+          }, 30000);
       });
 
       socket.on('joinedRoom', ({ roomId: receivedRoomId, partnerLanguage: receivedPartnerLang }: { roomId: string, partnerLanguage: string }) => {
