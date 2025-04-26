@@ -32,7 +32,7 @@ const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway backend
 // For web testing, localhost:8081 works
 // For deployment, this would be your actual domain
 const WEB_APP_PORT = 8081; // Default Expo web port
-const FRONTEND_URL = 'https://kodo-production-48f9.up.railway.app'; // Railway frontend URL
+const FRONTEND_URL = 'https://zonal-benevolence-production.up.railway.app'; // Updated Railway frontend URL
 
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
