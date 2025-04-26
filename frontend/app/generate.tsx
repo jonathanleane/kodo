@@ -121,38 +121,35 @@ export default function GenerateQRScreen() {
 
     socket.on('connect', () => {
       console.log('Connected to backend with socket ID:', socket.id);
-      socket.emit('listenForToken', { token: token });
-      console.log('Listening for join events on token:', token);
+      // Explicitly emit listenForToken with the generated token
+      setTimeout(() => {
+        console.log('Emitting listenForToken event for token:', token);
+        socket.emit('listenForToken', { token: token });
+      }, 1000); // Add a small delay to ensure connection is stable
+    });
+    
+    // Add event listener for room joining
+    socket.on('joinedRoom', ({ roomId, partnerLanguage }) => {
+      console.log(`Host joined room ${roomId} with partner language ${partnerLanguage}`);
+      setStatus('Partner joined!');
+      router.push({
+        pathname: '/join',
+        params: { roomId, myLanguage: 'en', partnerLanguage, joined: 'true' }
+      } as any);
     });
 
-    socket.on('joinedRoom', ({ roomId, partnerLanguage }: { roomId: string; partnerLanguage: string }) => {
-      console.log(`Partner joined room ${roomId} with language ${partnerLanguage}`);
-      setStatus('Partner joined!');
-       router.push({
-          pathname: '/join',
-          params: { roomId, myLanguage: 'en', partnerLanguage, joined: 'true' }
-       } as any);
-       if (socket) socket.disconnect();
+    // Add listeners for errors
+    socket.on('error', (errorMessage: { message: string }) => {
+      console.error('Received error from server:', errorMessage);
+      setError(errorMessage.message || 'Server error');
     });
 
     socket.on('connect_error', (err: Error) => {
-      console.error('Connection Error:', err.message);
-      // Non-critical - we've already generated the QR code via HTTP
-      console.log('Socket connection failed, but QR code was already generated via HTTP.');
-    });
-    
-    socket.on('error', (errorMessage: { message: string }) => {
-      console.error('Received error from server:', errorMessage);
-      // Non-critical since QR is already generated
+      console.error('Socket connection error:', err);
     });
 
-    // Add periodic ping to keep connection alive
-    const pingInterval = setInterval(() => {
-      if (socketRef.current && socketRef.current.connected) {
-        console.log('Sending keep-alive ping to server...');
-        socketRef.current.emit('ping');
-      }
-    }, 20000);
+    return socket; // Return the socket for cleanup
+  }
 
     // Cleanup on unmount
     return () => {
