@@ -79,7 +79,7 @@ export default function GenerateQRScreen() {
 
     socketRef.current = io(backendTarget, {
       reconnectionAttempts: 5,
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'], // Allow fallback to polling if websocket fails
       // Tell client to connect to this path
       path: socketIoPath,
     });

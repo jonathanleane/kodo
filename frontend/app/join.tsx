@@ -74,7 +74,7 @@ export default function JoinChatScreen() {
 
       socketRef.current = io(BACKEND_URL, {
           reconnectionAttempts: 3,
-          transports: ['websocket'],
+          transports: ['websocket', 'polling'], // Allow fallback to polling if websocket fails
           path: socketIoPath,
       });
 

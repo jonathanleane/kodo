@@ -30,7 +30,12 @@ const io = new Server(server, {
     cors: {
         origin: "*", // Keep allowing all origins for now
         methods: ["GET", "POST"]
-    }
+    },
+    // Add logging to troubleshoot connection issues
+    connectTimeout: 30000,
+    pingTimeout: 60000,
+    upgradeTimeout: 30000,
+    transports: ['websocket', 'polling']
 });
 
 // --- OpenAI Setup ---
@@ -119,7 +124,11 @@ app.post('/generate-qr', async (req, res) => {
 
 // --- WebSocket Event Handling ---
 io.on('connection', (socket) => {
-    console.log(`WebSocket connection received! Socket ID: ${socket.id}, Transport: ${socket.conn.transport.name}`);
+    console.log(`Connection received! Socket ID: ${socket.id}, Transport: ${socket.conn.transport.name}`);
+    // Log additional connection details for debugging
+    console.log(`Connection details - Handshake: ${JSON.stringify(socket.handshake.headers, null, 2)}`);
+    console.log(`Connection URL: ${socket.handshake.url}, Query: ${JSON.stringify(socket.handshake.query)}`);
+    console.log(`Socket.IO path: ${socketIoPath}`);
 
     console.log(`User connected: ${socket.id}`);
 
