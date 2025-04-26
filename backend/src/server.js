@@ -29,17 +29,17 @@ const server = http.createServer(app);
 const socketIoPath = "/socket.io"; // Use standard path
 
 const io = new Server(server, {
-    // Use default configuration without custom path
+    path: socketIoPath, // Explicitly set to /socket.io
     cors: {
-        origin: "*", // Keep allowing all origins for now
-        methods: ["GET", "POST"]
+        origin: "*", // Allow all origins
+        methods: ["GET", "POST"],
+        credentials: true
     },
-    // Simplified options
-    connectTimeout: 30000,
+    // Enhanced options for better connectivity
+    connectTimeout: 60000,
     pingTimeout: 60000,
-    transports: ['polling'],
-    // Reduce middleware complexity
-    maxHttpBufferSize: 1e6
+    transports: ['websocket', 'polling'], // Enable both transport types
+    allowUpgrades: true
 });
 
 // --- OpenAI Setup ---
@@ -509,6 +509,19 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(JSON.stringify({ message: 'Translation Chat Backend Running' }));
+});
+
+// Handle /backend-temp requests for compatibility with DigitalOcean setup
+app.get('/backend-temp', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify({ message: 'Translation Chat Backend Running (backend-temp path)' }));
+});
+
+// Add CORS middleware for all routes
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
 });
 
 // Add an API test endpoint 
