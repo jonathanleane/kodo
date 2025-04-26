@@ -22,7 +22,7 @@ const app = express();
 const server = http.createServer(app);
 
 // Define the path for Socket.IO (including the ingress prefix)
-const socketIoPath = "/api/socket.io"; // Match ingress route
+const socketIoPath = "/socket.io"; // Use standard path instead of /api prefix for testing
 
 const io = new Server(server, {
     // Tell Socket.IO server to listen on this path

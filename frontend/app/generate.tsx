@@ -25,7 +25,7 @@ import { DefaultEventsMap } from '@socket.io/component-emitter';
 
 // TODO: Replace with your actual backend URL if deployed
 // const BACKEND_URL = 'http://localhost:3001'; // Default for local dev
-const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Deployed backend URL
+const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app/backend-temp'; // Try using the explicitly routed backend URL
 // Base URL for the web app itself (for the QR code link)
 // For mobile testing on local network, this needs to be IP address
 // For web testing, localhost:8081 works
@@ -36,7 +36,7 @@ const WEB_APP_PORT = 8081; // Default Expo web port
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
 
 // Define the path for Socket.IO (must match server and ingress)
-const socketIoPath = "/api/socket.io";
+const socketIoPath = "/socket.io"; // Use standard path instead of /api prefix for testing
 
 export default function GenerateQRScreen() {
   const [token, setToken] = useState<string | null>(null);

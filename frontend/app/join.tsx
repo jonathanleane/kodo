@@ -19,13 +19,13 @@ import { Button as PaperButton } from 'react-native-paper';
 
 // TODO: Replace with your actual backend URL if deployed
 // const BACKEND_URL = 'http://localhost:3001'; // Default for local dev
-const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Deployed backend URL
+const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app/backend-temp'; // Try using the explicitly routed backend URL
 
 // Type for the socket instance
 type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
 
 // Define the path for Socket.IO (must match server and ingress)
-const socketIoPath = "/api/socket.io";
+const socketIoPath = "/socket.io"; // Use standard path instead of /api prefix for testing
 
 // --- Message Bubble Component ---
 const MessageBubble = ({ message }: { message: any }) => {
