@@ -25,7 +25,8 @@ import { DefaultEventsMap } from '@socket.io/component-emitter';
 
 // TODO: Replace with your actual backend URL if deployed
 // const BACKEND_URL = 'http://localhost:3001'; // Default for local dev
-const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Use the root domain for WebSocket connections
+// const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // Old DigitalOcean URL
+const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway deployment URL
 // Base URL for the web app itself (for the QR code link)
 // For mobile testing on local network, this needs to be IP address
 // For web testing, localhost:8081 works
