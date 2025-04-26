@@ -10,12 +10,16 @@ const crypto = require('crypto'); // Add crypto for token generation
 const PORT = process.env.PORT || 3001;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
+console.log(`Starting server on port ${PORT}`);
+console.log(`Using environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`OpenAI API key present: ${OPENAI_API_KEY ? 'Yes' : 'No'}`);
+console.log(`Redis URL present: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
+
 if (!OPENAI_API_KEY) {
-    console.error("Error: OPENAI_API_KEY environment variable not set.");
-    console.log("Please create a .env file in the backend directory with your OpenAI API key.");
-    console.log("Example .env file:");
-    console.log("OPENAI_API_KEY=your_api_key_here");
-    process.exit(1); // Exit if the key isn't found
+    console.warn("Warning: OPENAI_API_KEY environment variable not set.");
+    console.log("Translation functionality will not work without an OpenAI API key.");
+    console.log("Please set OPENAI_API_KEY in your environment variables.");
+    // Continue running without exiting - this allows the healthcheck to succeed
 }
 
 const app = express();
@@ -47,38 +51,36 @@ const openai = new OpenAI({
 let redisClient;
 (async () => {
   try {
-    // Use the DATABASE_URL environment variable provided by DigitalOcean
-    const redisUrl = process.env.DATABASE_URL;
+    // Use the DATABASE_URL environment variable provided by Railway or DigitalOcean
+    const redisUrl = process.env.DATABASE_URL || process.env.REDIS_URL;
     if (!redisUrl) {
-        throw new Error('DATABASE_URL environment variable not set for Redis connection.');
+        console.warn('No Redis URL found. Chat rooms will not persist between restarts.');
+        // Initialize a minimal redisClient mock to avoid null references
+        redisClient = {
+            isReady: false,
+            get: async () => null,
+            set: async () => {},
+            del: async () => {},
+            connect: async () => {},
+            quit: async () => {}
+        };
+        return; // Skip connecting
     }
-    console.log("Connecting to Redis using provided URL...");
-    redisClient = redis.createClient({
-      // Pass the connection string URL directly
-      url: redisUrl,
-      // Add TLS settings for secure connections on DO Managed Redis
-      socket: {
-          tls: true,
-          rejectUnauthorized: false // Necessary for some DO Redis configs, consider security implications
-      },
-      // Add reconnect strategy
-      retry_strategy: function(options) {
-          if (options.error && options.error.code === 'ECONNREFUSED') {
-              // End reconnecting on a specific error and flush all commands with a individual error
-              return new Error('The server refused the connection');
-          }
-          if (options.total_retry_time > 1000 * 60 * 60) {
-              // End reconnecting after a specific timeout and flush all commands with a individual error
-              return new Error('Retry time exhausted');
-          }
-          if (options.attempt > 10) {
-              // End reconnecting with built in error
-              return undefined;
-          }
-          // reconnect after
-          return Math.min(options.attempt * 100, 3000);
-      }
-    });
+    
+    console.log("Connecting to Redis...");
+    const redisOptions = {
+      url: redisUrl
+    };
+    
+    // Add TLS options if using a secure connection
+    if (redisUrl.startsWith('rediss://')) {
+      redisOptions.socket = {
+        tls: true,
+        rejectUnauthorized: false
+      };
+    }
+    
+    redisClient = redis.createClient(redisOptions);
     
     // Set up error handling with reconnect logic
     redisClient.on('error', (err) => {
@@ -91,12 +93,20 @@ let redisClient;
     });
     
     await redisClient.connect();
-    console.log('Connected to Redis');
+    console.log('Connected to Redis successfully');
   } catch (err) {
     console.error('Failed to connect to Redis:', err);
-    // Don't exit on initial connection failure - continue without Redis
-    // The server will attempt to handle operations gracefully without Redis
     console.log('Server will continue without Redis - chat functionality will be limited');
+    
+    // Initialize a minimal redisClient mock to avoid null references
+    redisClient = {
+        isReady: false,
+        get: async () => null,
+        set: async () => {},
+        del: async () => {},
+        connect: async () => {},
+        quit: async () => {}
+    };
   }
 })();
 
