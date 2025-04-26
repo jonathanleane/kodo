@@ -1,0 +1,64 @@
+alerts:
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
+databases:
+- cluster_name: db-caching-syd1-82001
+  engine: REDIS
+  name: db-caching-syd1-82001
+  production: true
+  version: "7"
+envs:
+- key: OPENAI_API_KEY
+  scope: RUN_AND_BUILD_TIME
+  value: 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
+features:
+- buildpack-stack=ubuntu-22
+ingress:
+  rules:
+  - component:
+      name: kodo
+    match:
+      path:
+        prefix: /api
+  - component:
+      name: kodo
+    match:
+      path:
+        prefix: /socket.io
+  - component:
+      name: kodo
+    match:
+      path:
+        prefix: /backend-temp
+  - component:
+      name: kodo-frontend
+    match:
+      path:
+        prefix: /
+name: kodo-app
+region: syd
+services:
+- environment_slug: node-js
+  envs:
+  - key: DATABASE_URL
+    scope: RUN_TIME
+    value: ${db-caching-syd1-82001.DATABASE_URL}
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: jonathanleane/kodo
+  http_port: 8080
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-1gb
+  name: kodo
+  run_command: node src/server.js
+  source_dir: /backend
+static_sites:
+- build_command: npx expo export
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: jonathanleane/kodo
+  name: kodo-frontend
+  output_dir: /dist
+  source_dir: /frontend
