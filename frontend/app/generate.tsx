@@ -150,16 +150,17 @@ export default function GenerateQRScreen() {
 
     return socket; // Return the socket for cleanup
   }
-
-    // Cleanup on unmount
+  
+  // Add cleanup for socket when component unmounts
+  useEffect(() => {
+    // Cleanup function
     return () => {
-      clearInterval(pingInterval);
       if (socketRef.current && socketRef.current.connected) {
         console.log('Leaving Generate screen, disconnecting socket...');
         socketRef.current.disconnect();
       }
     };
-  }
+  }, []);
 
   return (
     <View style={styles.container}>
