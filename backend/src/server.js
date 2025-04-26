@@ -223,6 +223,12 @@ function handleSocketConnection(socket) {
     socket.emit('server_ack', { status: 'connected', socketId: socket.id });
     
     console.log(`User connected: ${socket.id}`);
+    
+    // Handle ping messages from clients (keep-alive)
+    socket.on('ping', () => {
+        console.log(`Received ping from ${socket.id}, sending pong`);
+        socket.emit('pong');
+    });
 
     // ========== SOCKET EVENT HANDLERS ==========
     

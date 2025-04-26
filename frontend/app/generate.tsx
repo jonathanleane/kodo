@@ -79,17 +79,19 @@ export default function GenerateQRScreen() {
     const namespace = 'backend-temp';
     console.log(`Using namespace: ${namespace}`);
     
-    // Create Socket.IO connection
+    // Create Socket.IO connection with better reconnection settings
     socketRef.current = io(`${backendTarget}/${namespace}`, {
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 30,         // More reconnection attempts
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      timeout: 20000,
+      timeout: 30000,                   // Longer timeout
       transports: ['polling', 'websocket'],
-      path: '/socket.io', // Explicit path
+      path: '/socket.io',               // Explicit path
       forceNew: true,
       autoConnect: true,
-      withCredentials: false
+      withCredentials: false,
+      pingInterval: 10000,              // More frequent pings to keep connection alive
+      pingTimeout: 20000                // Longer ping timeout
     });
 
     const socket = socketRef.current;
@@ -98,7 +100,10 @@ export default function GenerateQRScreen() {
       console.log('Connected to backend with socket ID:', socket.id);
       setStatus('Requesting QR Code...');
       console.log('Emitting generateToken event...');
-      socket.emit('generateToken');
+      // Add a slight delay to ensure connection is stable
+      setTimeout(() => {
+        socket.emit('generateToken');
+      }, 500);
     });
 
     socket.on('tokenGenerated', (receivedToken: string) => {
@@ -178,11 +183,25 @@ export default function GenerateQRScreen() {
         setError(errorMessage.message || 'Server error');
     });
 
-    // Cleanup on unmount
-    return () => {
+    // Add periodic ping to keep connection alive
+    const pingInterval = setInterval(() => {
       if (socketRef.current && socketRef.current.connected) {
+        console.log('Sending keep-alive ping to server...');
+        // This is a custom ping - not needed if socket.io ping is working,
+        // but adds an extra layer of keep-alive messaging
+        socketRef.current.emit('ping');
+      }
+    }, 20000); // Every 20 seconds
+
+    // Cleanup on unmount - but NOT when leaving normally after QR code is scanned
+    return () => {
+      clearInterval(pingInterval);
+      // Only disconnect if we're not being redirected to the chat
+      if (socketRef.current && socketRef.current.connected && status !== 'Partner joined!') {
         console.log('Leaving Generate screen, disconnecting socket...');
         socketRef.current.disconnect();
+      } else {
+        console.log('Keeping socket connection alive for room joining...');
       }
     };
   }, [webAppBaseUrl]); // Rerun effect if webAppBaseUrl changes
