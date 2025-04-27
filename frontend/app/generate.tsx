@@ -97,15 +97,20 @@ export default function GenerateQRScreen() {
 
   useEffect(() => {
     if (isConnected && socket && qrToken) {
-      console.log('GenerateQRScreen: Socket connected and token available. Setting up listeners and emitting listenForToken.');
+      console.log('[Effect 2] Running: Socket connected, token available.');
+      
+      console.log('[Effect 2] Setting status to: Listening for partner...');
+      setStatus('Listening for partner... (Scan QR Code)');
+      console.log('[Effect 2] Status *should* be: Listening for partner...');
 
-      console.log('Emitting listenForToken event for token:', qrToken);
+      console.log('[Effect 2] Emitting listenForToken for token:', qrToken);
       socket.emit('listenForToken', { token: qrToken });
 
       const handleJoinedRoom = ({ roomId, partnerLanguage }: { roomId: string; partnerLanguage: string }) => {
-        console.log(`Host joined room ${roomId} with partner language ${partnerLanguage}`);
+        console.log('[handleJoinedRoom] Triggered. Setting status to: Partner joined! Navigating...');
         setStatus('Partner joined! Navigating...');
         setTimeout(() => {
+            console.log('[handleJoinedRoom] Navigating after delay...');
             router.push({
               pathname: '/join',
               params: { roomId, myLanguage: 'en', partnerLanguage, joined: 'true' }
@@ -114,21 +119,29 @@ export default function GenerateQRScreen() {
       };
       
       const handleError = (errorMessage: { message: string }) => {
-          console.error('Generate Screen: Received error from server via socket:', errorMessage);
+          console.error('[handleError] Triggered. Error from server via socket:', errorMessage);
           setError(errorMessage.message || 'Server error during connection/wait');
           setStatus('Error listening for partner');
       };
 
+      console.log('[Effect 2] Adding socket listeners (joinedRoom, error)');
       socket.on('joinedRoom', handleJoinedRoom);
       socket.on('error', handleError);
 
       return () => {
-          console.log("GenerateQRScreen: Cleaning up socket listeners");
-          socket.off('joinedRoom', handleJoinedRoom);
-          socket.off('error', handleError);
+          console.log("[Effect 2 Cleanup] Cleaning up socket listeners");
+          if(socket) {
+            socket.off('joinedRoom', handleJoinedRoom);
+            socket.off('error', handleError);
+          }
       };
+    } else {
+        console.log(`[Effect 2] Skipped: isConnected=${isConnected}, socket exists=${!!socket}, qrToken exists=${!!qrToken}`);
     }
   }, [isConnected, socket, qrToken, router]);
+
+  // Log state variables just before rendering
+  console.log(`[Render] Status: "${status}", QR URL Ready: ${!!qrUrl}, Error: ${error}`);
 
   return (
     <View style={styles.container}>
