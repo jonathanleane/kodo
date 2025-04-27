@@ -14,12 +14,13 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 // import * as Network from 'expo-network'; // To get IP address
 // import { DefaultEventsMap } from '@socket.io/component-emitter'; // Type comes from context
 
-// Backend URL configuration
-// const BACKEND_URL = 'http://localhost:3001'; // Local development
-// const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // DigitalOcean (legacy)
-const BACKEND_URL = 'https://kodo-backend-production.up.railway.app'; // NEW Correct backend URL
-// Base URL for the web app itself (for the QR code link)
-const FRONTEND_URL = 'https://kodo-frontend-production.up.railway.app'; // NEW Correct frontend URL
+// Use environment variables provided by the build environment
+// Fallback to hardcoded values only if environment variables are not set (useful for local dev without .env)
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://kodo-backend-production.up.railway.app'; 
+const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://kodo-frontend-production.up.railway.app';
+
+console.log('Using BACKEND_URL:', BACKEND_URL);
+console.log('Using FRONTEND_URL:', FRONTEND_URL);
 
 // Define the path for Socket.IO (standard path)
 // const socketIoPath = "/socket.io"; // Managed by context

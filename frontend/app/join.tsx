@@ -19,12 +19,10 @@ import { Button as PaperButton } from 'react-native-paper';
 import { useSocket } from '../context/SocketContext'; // Import the hook
 
 // Backend URL configuration
-// const BACKEND_URL = 'http://localhost:3001'; // Local development
-// const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // DigitalOcean (legacy)
-const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway backend
+// const BACKEND_URL = 'https://kodo-production.up.railway.app'; // REMOVE THIS - Provided by context
 
 // Type for the socket instance
-type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
+// type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>; // Provided by context
 
 // Define the path for Socket.IO (standard path)
 const socketIoPath = "/socket.io";
@@ -62,7 +60,6 @@ export default function JoinChatScreen() {
   const [inputText, setInputText] = useState('');
   const [partnerLeft, setPartnerLeft] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const socketRef = useRef<AppSocket | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const { socket, connect, disconnect, isConnected } = useSocket(); // Use context
 
