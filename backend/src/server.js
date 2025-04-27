@@ -638,18 +638,24 @@ function handleSocketConnection(socket) {
 
                     // 2. Notify the other user in the room ('partnerLeft')
                     if (partnerSocketId) {
-                        const partnerSocket = io.sockets.sockets.get(partnerSocketId);
+                        // Fix namespace lookup for partner socket
+                        const backendNamespace = io.of('/backend-temp');
+                        const partnerSocket = backendNamespace.sockets.get(partnerSocketId); 
+                        // const partnerSocket = io.sockets.sockets.get(partnerSocketId); // Old lookup
                         if (partnerSocket) {
                             console.log(`Notifying partner ${partnerSocketId} in room ${roomId} that user left`);
                             partnerSocket.emit('partnerLeft');
+                        } else {
+                            console.log(`Partner socket ${partnerSocketId} not found for notification.`);
                         }
-                         // Remove the disconnected user's socket mapping
+                         // Remove ONLY the disconnected user's socket mapping
                         console.log(`[Redis DEL ${userRoomKey}] Attempting for disconnect...`);
                         await redisClient.del(userRoomKey);
                         console.log(`[Redis DEL ${userRoomKey}] Success for disconnect.`);
 
-                        // Optionally: Leave room management to Redis TTL or implement explicit cleanup
-                        // For now, let's remove the room data if one person leaves
+                        // DO NOT immediately delete room or partner mapping
+                        console.log(`User ${disconnectedSocketId} left room ${roomId}. Keeping room data for potential reconnect.`);
+                        /* // Old cleanup logic:
                         console.log(`Removing room data for room ${roomId} as one user left.`);
                         console.log(`[Redis DEL ${roomKey}] Attempting for disconnect cleanup...`);
                         await redisClient.del(roomKey);
@@ -659,14 +665,14 @@ function handleSocketConnection(socket) {
                         console.log(`[Redis DEL ${partnerKey}] Attempting partner cleanup...`);
                         await redisClient.del(partnerKey);
                         console.log(`[Redis DEL ${partnerKey}] Success partner cleanup.`);
-
+                        */
                     } else {
-                        // If no partner was found (maybe already disconnected), just clean up
-                        console.log(`No partner found for disconnected user ${disconnectedSocketId} in room ${roomId}. Cleaning up.`);
+                        // If no partner was found (maybe already disconnected), just clean up THIS user and the room
+                        console.log(`No partner found for disconnected user ${disconnectedSocketId} in room ${roomId}. Cleaning up room and user mapping.`);
                          console.log(`[Redis DEL ${roomKey}] Attempting for disconnect cleanup...`);
-                         await redisClient.del(roomKey);
+                         await redisClient.del(roomKey); // Delete room if no partner
                          console.log(`[Redis DEL ${roomKey}] Success for disconnect cleanup.`);
-                         await redisClient.del(userRoomKey); // Clean up potentially stale mapping
+                         await redisClient.del(userRoomKey); // Clean up disconnected user's mapping
                     }
                 } else {
                     console.log(`Room data for room ${roomId} not found. Removing stale socket mapping ${userRoomKey}`);
