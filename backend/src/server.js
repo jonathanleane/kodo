@@ -580,7 +580,11 @@ function handleSocketConnection(socket) {
             };
 
             // Emit to recipient
-            const recipientSocket = io.sockets.sockets.get(recipientSocketId);
+            // const recipientSocket = io.sockets.sockets.get(recipientSocketId); // Old global lookup
+            const backendNamespace = io.of('/backend-temp'); // Get namespace instance
+            const recipientSocket = backendNamespace.sockets.get(recipientSocketId); // Lookup within namespace
+            console.log(`Lookup result for Recipient (${recipientSocketId}) in namespace ${backendNamespace.name}: ${recipientSocket ? 'Found' : 'Not Found'}`);
+
             if (recipientSocket) {
                 messagePayload.sender = 'partner';
                 recipientSocket.emit('newMessage', messagePayload);
