@@ -118,7 +118,12 @@ export default function JoinChatScreen() {
         
         // --- Setup Listeners FIRST --- 
         const handleJoinedRoom = ({ roomId: receivedRoomId, partnerLanguage: receivedPartnerLang }: { roomId: string, partnerLanguage: string }) => {
-            if (!isActive) return;
+            // Log reception of the event
+            console.log(`[handleJoinedRoom] EVENT RECEIVED! Room: ${receivedRoomId}, Partner Lang: ${receivedPartnerLang}`);
+            if (!isActive) {
+                console.log('[handleJoinedRoom] Component inactive, ignoring event.');
+                return;
+            }
             setDebugMessage(`Joined room ${receivedRoomId}!`);
             if (hostCheckInterval) clearInterval(hostCheckInterval);
             if (joinTimeout) clearTimeout(joinTimeout); // Clear join timeout
