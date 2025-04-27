@@ -63,6 +63,7 @@ export default function JoinChatScreen() {
   const [debugMessage, setDebugMessage] = useState<string>('Initializing...'); // For extra debug info
   const flatListRef = useRef<FlatList>(null);
   const { socket, connect, disconnect, isConnected } = useSocket(); // Use context
+  const connectionAttempted = useRef(false); // Track if connection was initiated
 
   // --- Connection & Joining Logic (for User B joining via URL) ---
   useEffect(() => {
@@ -70,8 +71,10 @@ export default function JoinChatScreen() {
     let connectTimeout: NodeJS.Timeout | null = null;
     let isActive = true; // Flag to prevent state updates on unmounted component
 
-    // Scenario 1: Joining via QR code link (token is present, not navigated from host)
-    if (token && !joined && uiStatus === 'idle') { // Only start if idle
+    // Scenario 1: Joining via QR code link (token is present, not joined)
+    // Only run connection logic ONCE if token is present and not already attempted/connected
+    if (token && !joined && !isConnected && !connectionAttempted.current) {
+      connectionAttempted.current = true; // Mark as attempted
       setUiStatus('connecting');
       setDebugMessage('Attempting to connect to socket...');
       setError(null);
@@ -80,9 +83,9 @@ export default function JoinChatScreen() {
       const userBLanguage = 'es'; 
       setMyLanguage(userBLanguage);
 
-      connect()
+      connect() // Call context connect
         .then((connectedSocket) => {
-          if (!isActive) return;
+          if (!isActive) return; // Check if component is still mounted
           setDebugMessage(`Socket connected (ID: ${connectedSocket.id}). Setting up listeners...`); 
           console.log('Join screen (Guest): Connected with socket ID:', connectedSocket.id);
           
@@ -90,7 +93,6 @@ export default function JoinChatScreen() {
           connectedSocket.on('joinedRoom', ({ roomId: receivedRoomId, partnerLanguage: receivedPartnerLang }: { roomId: string, partnerLanguage: string }) => {
             if (!isActive) return;
             setDebugMessage(`Joined room ${receivedRoomId}!`);
-            console.log(`Join screen (Guest): Successfully joined room ${receivedRoomId}`);
             if (hostCheckInterval) clearInterval(hostCheckInterval);
             if (connectTimeout) clearTimeout(connectTimeout);
             setRoomId(receivedRoomId);
@@ -102,29 +104,23 @@ export default function JoinChatScreen() {
           connectedSocket.on('waitingForHost', (data) => {
             if (!isActive) return;
             setDebugMessage('Received waitingForHost event. Waiting...');
-            console.log(`Join screen (Guest): Waiting for host event received:`, data);
-             if (connectTimeout) clearTimeout(connectTimeout);
-            setUiStatus('waiting'); // Update UI state
+            if (connectTimeout) clearTimeout(connectTimeout);
+            setUiStatus('waiting'); 
             setError(null);
-
-            // Start polling (checkHostStatus does nothing on backend, but keeps UI updated)
-            if (hostCheckInterval) clearInterval(hostCheckInterval); // Clear previous interval if any
+            if (hostCheckInterval) clearInterval(hostCheckInterval); 
             hostCheckInterval = setInterval(() => {
                 console.log(`Join screen (Guest): Checking if host has connected...`);
-                // This emit isn't strictly necessary as backend doesn't use it
-                // connectedSocket.emit('checkHostStatus', { token: token }); 
             }, 5000);
           });
 
           connectedSocket.on('error', (errorMessage: { message: string }) => {
             if (!isActive) return;
             setDebugMessage(`Socket error: ${errorMessage.message}`);
-            console.error('Join screen (Guest): Error from server:', errorMessage);
-             if (connectTimeout) clearTimeout(connectTimeout);
-             if (hostCheckInterval) clearInterval(hostCheckInterval);
+            if (connectTimeout) clearTimeout(connectTimeout);
+            if (hostCheckInterval) clearInterval(hostCheckInterval);
             setError(errorMessage.message || 'Could not join the chat room.');
             setUiStatus('error');
-            disconnect(); // Disconnect on error
+            disconnect(); 
           });
           // --- End Listeners for Guest ---
 
@@ -134,17 +130,17 @@ export default function JoinChatScreen() {
           connectedSocket.emit('join', { token: token, language: userBLanguage });
 
           // Set a timeout for the overall join process
-          if (connectTimeout) clearTimeout(connectTimeout); // Clear previous timeout just in case
+          if (connectTimeout) clearTimeout(connectTimeout); 
           connectTimeout = setTimeout(() => {
             if (isActive && uiStatus !== 'joined') { 
                 setDebugMessage('Join process timed out after 30s.');
-                console.error("Join screen (Guest): Join timeout"); // Keep console log
+                console.error("Join screen (Guest): Join timeout"); 
                 if (hostCheckInterval) clearInterval(hostCheckInterval);
                 setError(`Could not connect/join within timeout.`);
                 setUiStatus('error');
                 disconnect();
             }
-          }, 30000); // 30 second timeout
+          }, 30000); 
 
         })
         .catch((err) => {
@@ -153,15 +149,29 @@ export default function JoinChatScreen() {
           console.error('Join screen (Guest): Connection failed:', err);
           setError(`Could not connect: ${err.message}`);
           setUiStatus('error');
+          connectionAttempted.current = false; // Allow retry?
         });
     
-    // Scenario 2: Navigated here from GenerateQR (Host)
-    } else if (joined && passedRoomId) {
+    // Scenario 2: Host navigated here (already joined logically)
+    } else if (joined && passedRoomId && isConnected) {
         console.log(`Join screen (Host): Already joined room ${passedRoomId}. Socket connected: ${isConnected}`);
-        setRoomId(passedRoomId);
-        setMyLanguage(passedMyLanguage); // Should be 'en' from generate screen
-        setPartnerLanguage(passedPartnerLanguage);
-        setUiStatus('joined'); // Already joined
+        // Ensure state reflects reality if navigated here directly
+        if (uiStatus !== 'joined') {
+            setRoomId(passedRoomId);
+            setMyLanguage(passedMyLanguage);
+            setPartnerLanguage(passedPartnerLanguage);
+            setUiStatus('joined'); 
+            setDebugMessage('Ready for chat (as host).');
+        }
+    } else if (joined && !isConnected) {
+        // Host navigated here but socket disconnected in the meantime?
+        console.warn("Join screen (Host): Navigated as joined, but socket is not connected.");
+        setDebugMessage("Reconnecting socket...");
+        // Optional: try to reconnect automatically
+        // connect().catch(e => { setError('Failed to reconnect'); setUiStatus('error'); });
+        // Or just show error
+        setError("Connection lost after joining.");
+        setUiStatus('error');
     } else if (!token && !joined) {
         console.error("Join screen: Invalid state - no token and not joined.");
         setError("Invalid page state. Please start over.");
@@ -170,22 +180,23 @@ export default function JoinChatScreen() {
 
     // Cleanup function for the effect
     return () => {
-        isActive = false;
-        console.log("Join screen: Cleaning up connection/joining effect...");
-        if (connectTimeout) clearTimeout(connectTimeout);
-        if (hostCheckInterval) clearInterval(hostCheckInterval);
-        
-        // Remove listeners only if they were potentially added (guest flow)
-        if (socket && token && !joined) {
-            console.log("Join screen (Guest): Removing specific listeners");
-            socket.off('joinedRoom');
-            socket.off('waitingForHost');
-            socket.off('error');
-        }
-        // We don't disconnect here generally, as the chat logic might still need the socket
+      isActive = false;
+      console.log("Join screen: Cleaning up connection/joining effect...");
+      if (connectTimeout) clearTimeout(connectTimeout);
+      if (hostCheckInterval) clearInterval(hostCheckInterval);
+      
+      // Remove listeners ONLY if they were added in the guest flow and socket exists
+      if (socket && token && !joined) { 
+          console.log("Join screen (Guest): Removing specific listeners");
+          socket.off('joinedRoom');
+          socket.off('waitingForHost');
+          socket.off('error');
+      }
+      // Do NOT reset connectionAttempted.current here
+      // Do NOT disconnect here, context handles global connection lifecycle
     };
-    // Ensure dependencies cover all scenarios
-  }, [token, joined, connect, disconnect, socket, uiStatus]); 
+    // Minimal dependencies to trigger the connection attempt logic
+  }, [token, joined, connect, disconnect, isConnected, socket, passedRoomId, passedMyLanguage, passedPartnerLanguage, uiStatus]); // Added missing dependencies back but logic should prevent loops
 
   // --- Chat Logic (runs once connection status is 'joined') ---
   useEffect(() => {
