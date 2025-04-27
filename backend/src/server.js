@@ -27,12 +27,12 @@ const app = express();
 
 // Configure CORS properly using the cors package
 const corsOptions = {
-  origin: '*', // Allow all origins
+  origin: 'https://kodo-frontend.onrender.com', // Allow only the Render frontend
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Socket-ID'],
   credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  preflightContinue: false, // Ensure preflight requests are handled by cors middleware
+  optionsSuccessStatus: 204 // Or 200 depending on client needs
 };
 
 // Apply CORS middleware to all routes
