@@ -60,6 +60,7 @@ export default function JoinChatScreen() {
   const [inputText, setInputText] = useState('');
   const [partnerLeft, setPartnerLeft] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugMessage, setDebugMessage] = useState<string>('Initializing...'); // For extra debug info
   const flatListRef = useRef<FlatList>(null);
   const { socket, connect, disconnect, isConnected } = useSocket(); // Use context
 
@@ -70,23 +71,25 @@ export default function JoinChatScreen() {
     let isActive = true; // Flag to prevent state updates on unmounted component
 
     // Scenario 1: Joining via QR code link (token is present, not navigated from host)
-    if (token && !joined) {
+    if (token && !joined && uiStatus === 'idle') { // Only start if idle
       setUiStatus('connecting');
+      setDebugMessage('Attempting to connect to socket...');
       setError(null);
       console.log(`Join screen (Guest): Attempting connection for token: ${token}`);
 
-      // TODO: Get user's actual language preference dynamically
       const userBLanguage = 'es'; 
       setMyLanguage(userBLanguage);
 
       connect()
         .then((connectedSocket) => {
-          if (!isActive) return; // Don't proceed if component unmounted
+          if (!isActive) return;
+          setDebugMessage(`Socket connected (ID: ${connectedSocket.id}). Setting up listeners...`); 
           console.log('Join screen (Guest): Connected with socket ID:', connectedSocket.id);
           
           // --- Setup Listeners for Guest --- 
           connectedSocket.on('joinedRoom', ({ roomId: receivedRoomId, partnerLanguage: receivedPartnerLang }: { roomId: string, partnerLanguage: string }) => {
             if (!isActive) return;
+            setDebugMessage(`Joined room ${receivedRoomId}!`);
             console.log(`Join screen (Guest): Successfully joined room ${receivedRoomId}`);
             if (hostCheckInterval) clearInterval(hostCheckInterval);
             if (connectTimeout) clearTimeout(connectTimeout);
@@ -98,6 +101,7 @@ export default function JoinChatScreen() {
 
           connectedSocket.on('waitingForHost', (data) => {
             if (!isActive) return;
+            setDebugMessage('Received waitingForHost event. Waiting...');
             console.log(`Join screen (Guest): Waiting for host event received:`, data);
              if (connectTimeout) clearTimeout(connectTimeout);
             setUiStatus('waiting'); // Update UI state
@@ -114,6 +118,7 @@ export default function JoinChatScreen() {
 
           connectedSocket.on('error', (errorMessage: { message: string }) => {
             if (!isActive) return;
+            setDebugMessage(`Socket error: ${errorMessage.message}`);
             console.error('Join screen (Guest): Error from server:', errorMessage);
              if (connectTimeout) clearTimeout(connectTimeout);
              if (hostCheckInterval) clearInterval(hostCheckInterval);
@@ -124,13 +129,16 @@ export default function JoinChatScreen() {
           // --- End Listeners for Guest ---
 
           // Emit the join event after listeners are set up
+          setDebugMessage(`Socket connected (ID: ${connectedSocket.id}). Emitting join event...`);
           console.log(`Join screen (Guest): Emitting join event with token ${token} and lang ${userBLanguage}`);
           connectedSocket.emit('join', { token: token, language: userBLanguage });
 
           // Set a timeout for the overall join process
+          if (connectTimeout) clearTimeout(connectTimeout); // Clear previous timeout just in case
           connectTimeout = setTimeout(() => {
-            if (isActive && uiStatus !== 'joined') {
-                console.error("Join screen (Guest): Join timeout");
+            if (isActive && uiStatus !== 'joined') { 
+                setDebugMessage('Join process timed out after 30s.');
+                console.error("Join screen (Guest): Join timeout"); // Keep console log
                 if (hostCheckInterval) clearInterval(hostCheckInterval);
                 setError(`Could not connect/join within timeout.`);
                 setUiStatus('error');
@@ -141,6 +149,7 @@ export default function JoinChatScreen() {
         })
         .catch((err) => {
           if (!isActive) return;
+          setDebugMessage(`Socket connection failed: ${err.message}`);
           console.error('Join screen (Guest): Connection failed:', err);
           setError(`Could not connect: ${err.message}`);
           setUiStatus('error');
@@ -166,7 +175,7 @@ export default function JoinChatScreen() {
         if (connectTimeout) clearTimeout(connectTimeout);
         if (hostCheckInterval) clearInterval(hostCheckInterval);
         
-        // Remove listeners specific to the guest joining process
+        // Remove listeners only if they were potentially added (guest flow)
         if (socket && token && !joined) {
             console.log("Join screen (Guest): Removing specific listeners");
             socket.off('joinedRoom');
@@ -176,7 +185,7 @@ export default function JoinChatScreen() {
         // We don't disconnect here generally, as the chat logic might still need the socket
     };
     // Ensure dependencies cover all scenarios
-  }, [token, joined, connect, disconnect, isConnected, passedRoomId, passedMyLanguage, passedPartnerLanguage, socket, uiStatus]); 
+  }, [token, joined, connect, disconnect, socket, uiStatus]); 
 
   // --- Chat Logic (runs once connection status is 'joined') ---
   useEffect(() => {
@@ -281,14 +290,19 @@ export default function JoinChatScreen() {
   // --- Render Logic ---
   // Loading / Connecting / Waiting states
   if (uiStatus === 'connecting' || uiStatus === 'waiting' || uiStatus === 'idle') {
-    let statusMessage = 'Initializing...';
-    if (uiStatus === 'connecting') statusMessage = 'Connecting to chat service...';
-    if (uiStatus === 'waiting') statusMessage = 'Waiting for host to connect...';
+    let statusMessage = 'Initializing...'; // Default for idle
+    if (uiStatus === 'connecting') statusMessage = 'Connecting...';
+    if (uiStatus === 'waiting') statusMessage = 'Waiting for host...';
     
     return (
         <View style={styles.centerStatus}>
             <ActivityIndicator size="large" />
             <Text style={styles.statusText}>{statusMessage}</Text>
+            {/* Display Debug Info */}
+            <Text style={styles.debugText}>Status: {uiStatus}</Text>
+            <Text style={styles.debugText}>Socket Connected: {isConnected ? 'Yes' : 'No'}</Text>
+            {socket?.id && <Text style={styles.debugText}>Socket ID: {socket.id}</Text>}
+            <Text style={styles.debugText}>Debug: {debugMessage}</Text> 
             {uiStatus === 'waiting' && (
                 <Text style={styles.waitingText}>
                     Please keep this screen open.
@@ -480,5 +494,12 @@ const styles = StyleSheet.create({
   partnerLeftText: {
       color: '#d32f2f',
       fontWeight: 'bold',
+  },
+  debugText: {
+      fontSize: 12,
+      color: '#888',
+      marginTop: 5,
+      textAlign: 'center',
+      marginHorizontal: 15,
   }
 }); 
