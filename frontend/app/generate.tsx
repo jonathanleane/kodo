@@ -17,9 +17,9 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 // Backend URL configuration
 // const BACKEND_URL = 'http://localhost:3001'; // Local development
 // const BACKEND_URL = 'https://kodo-app-5dhoh.ondigitalocean.app'; // DigitalOcean (legacy)
-const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway backend
+const BACKEND_URL = 'https://kodo-production.up.railway.app'; // Railway backend - Assuming this is still correct for the new project?
 // Base URL for the web app itself (for the QR code link)
-const FRONTEND_URL = 'https://zonal-benevolence-production.up.railway.app'; // Confirmed correct frontend URL
+const FRONTEND_URL = 'https://kodo-frontend-production.up.railway.app'; // NEW Correct frontend URL
 
 // Define the path for Socket.IO (standard path)
 // const socketIoPath = "/socket.io"; // Managed by context
