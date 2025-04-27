@@ -45,7 +45,6 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       timeout: 20000,
       transports: ['polling', 'websocket'],
       path: '/socket.io',
-      forceNew: true, // Ensure a new connection if needed
       autoConnect: false, // Connect manually
       withCredentials: false,
     });
