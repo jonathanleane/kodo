@@ -352,12 +352,15 @@ function handleSocketConnection(socket) {
             console.log(`[Redis DEL ${tokenKey}] Success.`);
 
             // 7. Emit 'joinedRoom' to both users
-            // Revert to emitting on socket variables
-            console.log(`Emitting joinedRoom to User B (${clientB_SocketId}) via socket variable`);
-            socket.emit('joinedRoom', { roomId: roomId, partnerLanguage: userA_Language });
+            const payloadForB = { roomId: roomId, partnerLanguage: userA_Language };
+            const payloadForA = { roomId: roomId, partnerLanguage: userB_Language };
             
-            console.log(`Emitting joinedRoom to User A (${userA_SocketId}) via userASocket variable`);
-            userASocket.emit('joinedRoom', { roomId: roomId, partnerLanguage: userB_Language });
+            // Revert to emitting on socket variables
+            console.log(`Emitting joinedRoom to User B (${clientB_SocketId}) via socket variable. Payload:`, JSON.stringify(payloadForB));
+            socket.emit('joinedRoom', payloadForB);
+            
+            console.log(`Emitting joinedRoom to User A (${userA_SocketId}) via userASocket variable. Payload:`, JSON.stringify(payloadForA));
+            userASocket.emit('joinedRoom', payloadForA);
 
             console.log(`Successfully paired users in room ${roomId}`);
 
