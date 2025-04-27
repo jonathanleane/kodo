@@ -61,6 +61,7 @@ export default function JoinChatScreen() {
   const [partnerLeft, setPartnerLeft] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugMessage, setDebugMessage] = useState<string>('Initializing...'); // For extra debug info
+  const [isReconnecting, setIsReconnecting] = useState(false); // Track reconnection attempts
   const flatListRef = useRef<FlatList>(null);
   const { socket, connect, disconnect, isConnected } = useSocket(); // Use context
   const connectionAttempted = useRef(false); // Track if connection was initiated
@@ -225,7 +226,7 @@ export default function JoinChatScreen() {
     // Simplify dependencies to reduce potential re-runs
   }, [token, joined, isConnected, socket, disconnect, passedRoomId, passedMyLanguage, passedPartnerLanguage]); // Removed myLanguage, uiStatus
 
-  // --- Chat Logic (runs once connection status is 'joined') ---
+  // --- Effect 3: Chat Logic (runs once connection status is 'joined') ---
   useEffect(() => {
     // Only run chat logic if joined successfully and socket is available
     if (uiStatus !== 'joined' || !roomId || !socket) {
@@ -238,8 +239,14 @@ export default function JoinChatScreen() {
         return; // Exit if not in the right state
     }
     
-    let isActive = true; // Flag for async operations
+    let isActive = true; 
     console.log(`Chat logic: Socket active (ID: ${socket.id}) in room ${roomId}. Setting up listeners.`);
+    // If we were reconnecting, clear the flag now that we are joined and ready
+    if (isReconnecting) {
+        console.log("Chat logic: Reconnection successful.");
+        setDebugMessage("Reconnected successfully.");
+        setIsReconnecting(false);
+    }
 
     // --- Define Event Handlers ---
     const handleNewMessage = (message: any) => {
@@ -262,25 +269,48 @@ export default function JoinChatScreen() {
         // Consider disconnecting or navigating away
         // disconnect(); 
         // router.replace('/');
+        setIsReconnecting(false);
     };
     const handleDisconnect = (reason: Socket.DisconnectReason) => {
         if (!isActive) return;
         console.log('Disconnected during chat:', reason);
+        // Don't immediately go to error state if it was an unexpected disconnect
         if (reason !== 'io client disconnect' && uiStatus === 'joined') {
-             setError("Lost connection to the server.");
-             setUiStatus('error');
-             Alert.alert("Disconnected", "Lost connection to the server.");
-             // SocketProvider handles actual disconnect state, just update UI
-             // disconnect(); // Context handles this
+             setDebugMessage(`Connection lost: ${reason}. Attempting to reconnect...`);
+             setError(null); // Clear previous errors
+             setIsReconnecting(true); // Set reconnecting status
+             // uiStatus remains 'joined' logically, UI will show reconnecting overlay
+             // Socket.IO client will automatically try to reconnect based on context settings
+             // We could add a listener for explicit reconnect_failed event if needed
         }
+    };
+    // <<< ADDED: Listener for reconnect success >>>
+    const handleConnect = () => {
+        if (!isActive || !isReconnecting) return; // Only handle if we were explicitly reconnecting
+        console.log('Chat logic: Reconnect successful (handleConnect)');
+        setDebugMessage("Reconnected successfully.");
+        setIsReconnecting(false);
+        setError(null);
+        // No need to change uiStatus, should still be 'joined'
+    };
+     // <<< ADDED: Listener for permanent reconnect failure >>>
+    const handleReconnectFailed = () => {
+        if (!isActive) return;
+        console.error('Chat logic: Permanent reconnection failure.');
+        setDebugMessage("Failed to reconnect after multiple attempts.");
+        setError("Connection lost. Please check your internet and refresh.");
+        setIsReconnecting(false);
+        setUiStatus('error'); // Now set error state
     };
 
     // --- Register Listeners ---
-    console.log("Chat logic: Attaching listeners");
+    console.log("Chat logic: Attaching listeners (newMessage, partnerLeft, error, disconnect, connect, reconnect_failed)");
     socket.on('newMessage', handleNewMessage);
     socket.on('partnerLeft', handlePartnerLeft);
-    socket.on('error', handleError); // General errors during chat
-    socket.on('disconnect', handleDisconnect); // Listen for disconnects
+    socket.on('error', handleError); 
+    socket.on('disconnect', handleDisconnect); 
+    socket.on('connect', handleConnect); // Listen for successful connect/reconnect
+    socket.io.on("reconnect_failed", handleReconnectFailed); // Listen for permanent failure
 
     // --- Cleanup Chat Listeners ---
     return () => {
@@ -292,14 +322,15 @@ export default function JoinChatScreen() {
         socket.off('partnerLeft', handlePartnerLeft);
         socket.off('error', handleError);
         socket.off('disconnect', handleDisconnect);
+        socket.off('connect', handleConnect);
+        socket.io.off("reconnect_failed", handleReconnectFailed);
       }
-      // Disconnect socket when leaving the chat screen entirely
-      // This assumes leaving /join means the chat is over.
-      console.log("Chat logic: Disconnecting socket via context.");
-      disconnect();
+      // We disconnect globally when LEAVING the chat screen, not just on effect cleanup
+      // This is handled by the context provider cleanup now, or could be done via router events
+      // disconnect(); // Moved disconnect call out of here
     };
     // Depend on socket instance and joined state
-  }, [uiStatus, roomId, socket, disconnect]); 
+  }, [uiStatus, roomId, socket, disconnect, isReconnecting]); // Added isReconnecting dependency
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -381,6 +412,13 @@ export default function JoinChatScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Adjust as needed
         >
+            {/* ADD Reconnecting Indicator Overlay */}
+            {isReconnecting && (
+                <View style={styles.reconnectingOverlay}>
+                    <ActivityIndicator size="small" color="#FFF" />
+                    <Text style={styles.reconnectingText}>Connection lost. Reconnecting...</Text>
+                </View>
+            )}
             {partnerLeft && (
                 <View style={styles.partnerLeftBanner}>
                     <Text style={styles.partnerLeftText}>Your partner has left the chat.</Text>
@@ -400,12 +438,12 @@ export default function JoinChatScreen() {
                     value={inputText}
                     onChangeText={setInputText}
                     placeholder="Type your message..."
-                    editable={!partnerLeft && isConnected} // Disable input if partner left or disconnected
+                    editable={!partnerLeft && isConnected && !isReconnecting} // Disable input if partner left OR not connected/reconnecting
                 />
                 <PaperButton 
                   mode="contained" 
                   onPress={handleSend} 
-                  disabled={partnerLeft || !inputText.trim() || !isConnected} // Disable send if partner left, no text, or disconnected
+                  disabled={partnerLeft || !inputText.trim() || !isConnected || isReconnecting} // Disable send if partner left OR not connected/reconnecting
                   style={styles.sendButton}
                 >
                     Send
@@ -539,5 +577,22 @@ const styles = StyleSheet.create({
       marginTop: 5,
       textAlign: 'center',
       marginHorizontal: 15,
+  },
+  reconnectingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10, // Ensure it's above other elements
+  },
+  reconnectingText: {
+      color: '#FFF',
+      marginLeft: 10,
+      fontWeight: 'bold',
   }
 }); 
