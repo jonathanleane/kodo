@@ -217,6 +217,11 @@ function handleSocketConnection(socket) {
     
     console.log(`User connected: ${socket.id}`);
     
+    // <<< ADD Simple Test Emit >>>
+    console.log(`Emitting connection_test to ${socket.id}`);
+    socket.emit('connection_test', { id: socket.id, message: 'Backend says hello!' });
+    // <<< END Test Emit >>>
+    
     // Handle ping messages from clients (keep-alive)
     socket.on('ping', () => {
         console.log(`Received ping from ${socket.id}, sending pong`);

@@ -117,6 +117,13 @@ export default function JoinChatScreen() {
         if (!myLanguage) setMyLanguage(userBLanguage);
         
         // --- Setup Listeners FIRST --- 
+        const handleConnectionTest = (data: any) => {
+            console.log('[handleConnectionTest] Received:', data);
+            setDebugMessage(`Received connection_test from backend! ID: ${data.id}`);
+        };
+        console.log('[Effect 2] Adding listener: connection_test');
+        socket.on('connection_test', handleConnectionTest);
+
         const handleJoinedRoom = ({ roomId: receivedRoomId, partnerLanguage: receivedPartnerLang }: { roomId: string, partnerLanguage: string }) => {
             // Log reception of the event
             console.log(`[handleJoinedRoom] EVENT RECEIVED! Room: ${receivedRoomId}, Partner Lang: ${receivedPartnerLang}`);
@@ -195,6 +202,7 @@ export default function JoinChatScreen() {
             if (joinTimeout) clearTimeout(joinTimeout);
             if (hostCheckInterval) clearInterval(hostCheckInterval);
             if (socket) {
+                socket.off('connection_test', handleConnectionTest);
                 socket.off('joinedRoom', handleJoinedRoom);
                 socket.off('waitingForHost', handleWaitingForHost);
                 socket.off('error', handleError);
