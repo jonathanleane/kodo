@@ -20,8 +20,8 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 // const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://kodo-frontend-production.up.railway.app';
 
 // HARDCODE for now to ensure correct URL is used
-const BACKEND_URL = 'https://kodo-backend-production.up.railway.app'; 
-const FRONTEND_URL = 'https://kodo-frontend-production.up.railway.app';
+const BACKEND_URL = 'https://kodo-backend-s7vj.onrender.com'; // NEW Render Backend URL
+const FRONTEND_URL = 'https://kodo-frontend-production.up.railway.app'; // Keep previous frontend URL for now (will update later)
 
 console.log('Using BACKEND_URL:', BACKEND_URL);
 console.log('Using FRONTEND_URL:', FRONTEND_URL);
