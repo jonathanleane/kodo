@@ -3,7 +3,7 @@ import io, { Socket } from 'socket.io-client';
 import { DefaultEventsMap } from '@socket.io/component-emitter';
 
 // Backend URL configuration - Ensure this matches your actual backend URL
-const BACKEND_URL = 'https://kodo-production.up.railway.app';
+const BACKEND_URL = 'https://kodo-backend-production.up.railway.app';
 const SOCKET_NAMESPACE = '/backend-temp'; // Use the correct namespace
 
 // Type for the socket instance
