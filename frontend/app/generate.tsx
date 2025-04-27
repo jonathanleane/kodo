@@ -80,7 +80,6 @@ export default function GenerateQRScreen() {
     .then((connectedSocket) => {
         if (!connectedSocket) throw new Error("Socket connection failed or wasn't available.");
         console.log('Socket connected via context, ID:', connectedSocket.id);
-        setStatus('Scan the QR code below');
         hasConnectedSocket.current = true;
     })
     .catch(err => {
