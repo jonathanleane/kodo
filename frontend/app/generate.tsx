@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -21,7 +21,7 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 
 // HARDCODE for now to ensure correct URL is used
 const BACKEND_URL = 'https://kodo-backend-s7vj.onrender.com'; // NEW Render Backend URL
-const FRONTEND_URL = 'https://kodo-frontend-production.up.railway.app'; // Keep previous frontend URL for now (will update later)
+const FRONTEND_URL = 'https://kodo-frontend.onrender.com'; // Use the actual Render Frontend URL
 
 console.log('Using BACKEND_URL:', BACKEND_URL);
 console.log('Using FRONTEND_URL:', FRONTEND_URL);
@@ -30,118 +30,110 @@ console.log('Using FRONTEND_URL:', FRONTEND_URL);
 // const socketIoPath = "/socket.io"; // Managed by context
 
 export default function GenerateQRScreen() {
-  const [token, setToken] = useState<string | null>(null);
+  const [qrToken, setQrToken] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('Preparing...');
   const [error, setError] = useState<string | null>(null);
-  // const socketRef = useRef<AppSocket | null>(null); // Remove socketRef
-  const { socket, connect, disconnect, isConnected } = useSocket(); // Use context
+  const { socket, connect, disconnect, isConnected } = useSocket();
+  const hasFetchedToken = useRef(false);
+  const hasConnectedSocket = useRef(false);
 
-  // Always use the production frontend URL for QR codes
   const webAppBaseUrl = FRONTEND_URL;
-  const navigation = useNavigation(); // Use navigation hook if needed for header etc.
+  const navigation = useNavigation();
 
-  // Generate a QR code via HTTP and then connect socket
   useEffect(() => {
-    console.log("Generate QR Screen: Using HTTP endpoint to generate token");
+    if (hasFetchedToken.current) return;
+    hasFetchedToken.current = true; 
+
+    console.log("Generate QR Screen: Fetching token...");
     setStatus('Requesting QR Code...');
-    let currentToken: string | null = null;
+    setError(null);
+
+    let fetchedToken: string | null = null;
 
     fetch(`${BACKEND_URL}/generate-qr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ useHttp: true }) // Flag to indicate HTTP-based flow
+      body: JSON.stringify({ useHttp: true })
     })
     .then(response => {
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
       return response.json();
     })
     .then(data => {
-      console.log('Token received from backend HTTP endpoint:', data.token);
-      currentToken = data.token;
-      if (currentToken) {
-        setToken(currentToken);
-        const joinUrl = `${webAppBaseUrl}/join?token=${currentToken}`;
-        setQrUrl(joinUrl);
-        console.log("Generated QR URL:", joinUrl);
-        setStatus('Connecting to chat service...');
-        
-        // Connect using the context's connect function
-        return connect(); // Return the promise from connect()
-      } else {
-        throw new Error('Backend did not provide a token.');
+      fetchedToken = data.token;
+      if (!fetchedToken) throw new Error('Backend did not provide a token.');
+      
+      console.log('Token received:', fetchedToken);
+      setQrToken(fetchedToken);
+      const joinUrl = `${webAppBaseUrl}/join?token=${fetchedToken}`;
+      setQrUrl(joinUrl);
+      console.log("Generated QR URL:", joinUrl);
+      setStatus('Connecting to chat service...');
+      
+      if (!isConnected && !hasConnectedSocket.current) {
+          hasConnectedSocket.current = true;
+          return connect();
       }
+      return Promise.resolve(socket);
     })
     .then((connectedSocket) => {
-      // This runs after socket connection is successful
-      setStatus('Scan the QR code below');
-      console.log('Socket connected via context, ID:', connectedSocket.id);
-      
-      // Now that we are connected and have the token, listen for it
-      if (currentToken) {
-        console.log('Emitting listenForToken event for token:', currentToken);
-        connectedSocket.emit('listenForToken', { token: currentToken });
-
-        // Add listener for when the partner joins
-        connectedSocket.on('joinedRoom', ({ roomId, partnerLanguage }) => {
-          console.log(`Host joined room ${roomId} with partner language ${partnerLanguage}`);
-          setStatus('Partner joined!');
-          // Navigate to join screen (which acts as chat screen for host)
-          // The socket instance is available via context on the target screen
-          router.push({
-            pathname: '/join',
-            params: { roomId, myLanguage: 'en', partnerLanguage, joined: 'true' }
-          } as any);
-        });
-
-        // Add listener for general errors on this socket instance
-        connectedSocket.on('error', (errorMessage: { message: string }) => {
-            console.error('Generate Screen: Received error from server:', errorMessage);
-            setError(errorMessage.message || 'Server error during connection/wait');
-            setStatus('Error');
-            // Maybe disconnect on error?
-            // disconnect(); 
-        });
-      } else {
-          throw new Error("Token was lost before socket connection completed.");
-      }
+        if (!connectedSocket) throw new Error("Socket connection failed or wasn't available.");
+        console.log('Socket connected via context, ID:', connectedSocket.id);
+        setStatus('Scan the QR code below');
+        hasConnectedSocket.current = true;
     })
     .catch(err => {
-      console.error('Error during token generation or socket connection:', err);
-      setError(`Failed setup: ${err.message}`);
+      console.error('Error during token generation or initial socket connection:', err);
+      setError(`Setup failed: ${err.message}`);
       setStatus('Error');
+      hasFetchedToken.current = false;
+      hasConnectedSocket.current = false;
     });
 
-    // Cleanup function for the effect
     return () => {
-        // Remove listeners specific to this screen when component unmounts
-        // Check if socket exists before trying to remove listeners
-        if (socket) {
-            console.log("GenerateQRScreen: Cleaning up listeners");
-            socket.off('joinedRoom');
-            socket.off('error');
-            // Decide if we should disconnect here. Usually, we want the socket
-            // to persist until the user explicitly leaves the chat flow.
-            // If navigating away means abandoning the chat setup, uncomment disconnect:
-            // disconnect(); 
-        }
+      console.log("GenerateQRScreen: Unmounting token fetch/connect effect");
     };
-    // Dependencies: connect hook and socket instance (for cleanup)
-  }, [connect, socket]); 
+  }, [connect, isConnected, socket]);
 
-  // Remove the local connectWithSocket function
-  // function connectWithSocket(token: string) { ... } // REMOVED
-  
-  // Remove the local socket cleanup useEffect
-  // useEffect(() => { ... }); // REMOVED
+  useEffect(() => {
+    if (isConnected && socket && qrToken) {
+      console.log('GenerateQRScreen: Socket connected and token available. Setting up listeners and emitting listenForToken.');
+
+      console.log('Emitting listenForToken event for token:', qrToken);
+      socket.emit('listenForToken', { token: qrToken });
+
+      const handleJoinedRoom = ({ roomId, partnerLanguage }: { roomId: string; partnerLanguage: string }) => {
+        console.log(`Host joined room ${roomId} with partner language ${partnerLanguage}`);
+        setStatus('Partner joined!');
+        router.push({
+          pathname: '/join',
+          params: { roomId, myLanguage: 'en', partnerLanguage, joined: 'true' }
+        } as any);
+      };
+      
+      const handleError = (errorMessage: { message: string }) => {
+          console.error('Generate Screen: Received error from server via socket:', errorMessage);
+          setError(errorMessage.message || 'Server error during connection/wait');
+          setStatus('Error');
+      };
+
+      socket.on('joinedRoom', handleJoinedRoom);
+      socket.on('error', handleError);
+
+      return () => {
+          console.log("GenerateQRScreen: Cleaning up socket listeners");
+          socket.off('joinedRoom', handleJoinedRoom);
+          socket.off('error', handleError);
+      };
+    }
+  }, [isConnected, socket, qrToken, router]);
 
   return (
     <View style={styles.container}>
       <Text style={styles.status}>{status}</Text>
       {error && <Text style={styles.errorText}>{error}</Text>}
-      {qrUrl && !error && status !== 'Connecting to chat service...' ? (
+      {qrUrl && status === 'Scan the QR code below' && !error ? (
         <QRCode
           value={qrUrl}
           size={250}
@@ -151,7 +143,7 @@ export default function GenerateQRScreen() {
       ) : (
         !error && <ActivityIndicator size="large" color="#007AFF" />
       )}
-      {qrUrl && !error && status !== 'Connecting to chat service...' && (
+      {qrUrl && status === 'Scan the QR code below' && !error && (
           <Text style={styles.info}>Ask your chat partner to scan this code using their phone's camera.</Text>
       )}
     </View>
