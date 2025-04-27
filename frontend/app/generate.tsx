@@ -16,8 +16,12 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 
 // Use environment variables provided by the build environment
 // Fallback to hardcoded values only if environment variables are not set (useful for local dev without .env)
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://kodo-backend-production.up.railway.app'; 
-const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://kodo-frontend-production.up.railway.app';
+// const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://kodo-backend-production.up.railway.app'; 
+// const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://kodo-frontend-production.up.railway.app';
+
+// HARDCODE for now to ensure correct URL is used
+const BACKEND_URL = 'https://kodo-backend-production.up.railway.app'; 
+const FRONTEND_URL = 'https://kodo-frontend-production.up.railway.app';
 
 console.log('Using BACKEND_URL:', BACKEND_URL);
 console.log('Using FRONTEND_URL:', FRONTEND_URL);

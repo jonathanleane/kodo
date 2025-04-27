@@ -4,7 +4,10 @@ import { DefaultEventsMap } from '@socket.io/component-emitter';
 
 // Use environment variable provided by the build environment
 // Fallback to hardcoded value only if environment variable is not set
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://kodo-backend-production.up.railway.app';
+// const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://kodo-backend-production.up.railway.app'; 
+
+// HARDCODE for now to ensure correct URL is used
+const BACKEND_URL = 'https://kodo-backend-production.up.railway.app'; 
 const SOCKET_NAMESPACE = '/backend-temp'; // Use the correct namespace
 
 console.log('SocketContext Using BACKEND_URL:', BACKEND_URL);
