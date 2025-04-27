@@ -165,21 +165,23 @@ export default function JoinChatScreen() {
         // --- End Listeners Setup ---
 
         // Emit the join event
-        console.log(`[Effect 2] Emitting join event with token ${token} and lang ${userBLanguage}`);
+        console.log(`[Effect 2] >>>>>> BEFORE EMITTING join event with token ${token}`);
+        setDebugMessage(`Emitting join for token ${token}...`); // Update debug before emit
         socket.emit('join', { token: token, language: userBLanguage });
+        console.log(`[Effect 2] <<<<<< AFTER EMITTING join event with token ${token}`);
 
         // Set a timeout specifically for the join/wait phase
         joinTimeout = setTimeout(() => {
             if (isActive && uiStatus !== 'joined') { 
-                setDebugMessage('Join/Wait process timed out after 30s.');
+                setDebugMessage('Join/Wait process timed out after 90s.');
                 console.error("Join screen (Guest): Join/Wait timeout"); 
                 if (hostCheckInterval) clearInterval(hostCheckInterval);
-                setError(`Host did not respond or join failed within timeout.`);
+                setError(`Host did not respond or join failed within 90s timeout.`);
                 setUiStatus('error');
                 disconnect();
                 joinAttempted.current = false; // Allow retry?
             }
-          }, 30000); // 30 second timeout for join/wait
+          }, 90000); // Increased timeout to 90 seconds
           
         // Cleanup function for THIS effect
         return () => {
