@@ -32,7 +32,7 @@ console.log('Using FRONTEND_URL:', FRONTEND_URL);
 export default function GenerateQRScreen() {
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('Preparing...');
+  const [status, setStatus] = useState<string>('Initializing...');
   const [error, setError] = useState<string | null>(null);
   const { socket, connect, disconnect, isConnected } = useSocket();
   const hasFetchedToken = useRef(false);
@@ -105,17 +105,19 @@ export default function GenerateQRScreen() {
 
       const handleJoinedRoom = ({ roomId, partnerLanguage }: { roomId: string; partnerLanguage: string }) => {
         console.log(`Host joined room ${roomId} with partner language ${partnerLanguage}`);
-        setStatus('Partner joined!');
-        router.push({
-          pathname: '/join',
-          params: { roomId, myLanguage: 'en', partnerLanguage, joined: 'true' }
-        } as any);
+        setStatus('Partner joined! Navigating...');
+        setTimeout(() => {
+            router.push({
+              pathname: '/join',
+              params: { roomId, myLanguage: 'en', partnerLanguage, joined: 'true' }
+            } as any);
+        }, 500);
       };
       
       const handleError = (errorMessage: { message: string }) => {
           console.error('Generate Screen: Received error from server via socket:', errorMessage);
           setError(errorMessage.message || 'Server error during connection/wait');
-          setStatus('Error');
+          setStatus('Error listening for partner');
       };
 
       socket.on('joinedRoom', handleJoinedRoom);
@@ -133,18 +135,18 @@ export default function GenerateQRScreen() {
     <View style={styles.container}>
       <Text style={styles.status}>{status}</Text>
       {error && <Text style={styles.errorText}>{error}</Text>}
-      {qrUrl && status === 'Scan the QR code below' && !error ? (
-        <QRCode
-          value={qrUrl}
-          size={250}
-          color="black"
-          backgroundColor="white"
-        />
+      {qrUrl && status === 'Listening for partner... (Scan QR Code)' && !error ? (
+        <View style={styles.qrContainer}>
+          <QRCode
+            value={qrUrl}
+            size={250}
+            color="black"
+            backgroundColor="white"
+          />
+          <Text style={styles.info}>Ask your chat partner to scan this code using their phone's camera.</Text>
+        </View>
       ) : (
         !error && <ActivityIndicator size="large" color="#007AFF" />
-      )}
-      {qrUrl && status === 'Scan the QR code below' && !error && (
-          <Text style={styles.info}>Ask your chat partner to scan this code using their phone's camera.</Text>
       )}
     </View>
   );
@@ -169,11 +171,20 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontWeight: 'bold'
     },
+  qrContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   info: {
       marginTop: 30,
       textAlign: 'center',
       fontSize: 16,
       color: 'grey',
       paddingHorizontal: 10,
+  },
+  debugText: {
+      fontSize: 12,
+      color: '#888',
+      marginTop: 5,
   }
 }); 
