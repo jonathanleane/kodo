@@ -222,7 +222,8 @@ export default function JoinChatScreen() {
     }
     
     // Dependencies: Trigger when connection status changes or token/socket become available.
-  }, [token, joined, isConnected, socket, disconnect, passedRoomId, passedMyLanguage, passedPartnerLanguage, myLanguage, uiStatus]); // Added myLanguage & uiStatus here
+    // Simplify dependencies to reduce potential re-runs
+  }, [token, joined, isConnected, socket, disconnect, passedRoomId, passedMyLanguage, passedPartnerLanguage]); // Removed myLanguage, uiStatus
 
   // --- Chat Logic (runs once connection status is 'joined') ---
   useEffect(() => {
