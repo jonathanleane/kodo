@@ -346,12 +346,21 @@ function handleSocketConnection(socket) {
             await redisClient.del(tokenKey);
             console.log(`[Redis DEL ${tokenKey}] Success.`);
 
-            // 7. Emit 'joinedRoom' to both users
-            // Notify User B (Scanner)
-            socket.emit('joinedRoom', { roomId: roomId, partnerLanguage: userA_Language });
-            // Notify User A (QR Generator)
-            userASocket.emit('joinedRoom', { roomId: roomId, partnerLanguage: userB_Language });
-            // Could also use io.to(roomId).emit(...) but emitting individually allows sending different partner languages
+            // 7. Emit 'joinedRoom' to both users via the room
+            // socket.emit('joinedRoom', { roomId: roomId, partnerLanguage: userA_Language });
+            // userASocket.emit('joinedRoom', { roomId: roomId, partnerLanguage: userB_Language });
+            
+            // Emit specifically to each user to send tailored partnerLanguage
+            console.log(`Emitting joinedRoom to User B (${clientB_SocketId})`);
+            io.to(clientB_SocketId).emit('joinedRoom', { 
+                roomId: roomId, 
+                partnerLanguage: userA_Language 
+            });
+            console.log(`Emitting joinedRoom to User A (${userA_SocketId})`);
+            io.to(userA_SocketId).emit('joinedRoom', { 
+                roomId: roomId, 
+                partnerLanguage: userB_Language 
+            });
 
             console.log(`Successfully paired users in room ${roomId}`);
 
