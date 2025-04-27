@@ -34,6 +34,10 @@ lerna-debug.log*
 .env*
 !.env.example
 
+# Specific Env files
+backend/.env
+frontend/.env
+
 # Other
 .npm
 .yarn-integrity

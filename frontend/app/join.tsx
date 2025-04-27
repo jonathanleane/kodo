@@ -129,15 +129,22 @@ export default function JoinChatScreen() {
         };
 
         const handleWaitingForHost = (data: any) => {
-            if (!isActive) return;
-            setDebugMessage('Received waitingForHost event. Waiting...');
-            if (joinTimeout) clearTimeout(joinTimeout); // Clear join timeout
-            setUiStatus('waiting'); 
-            setError(null);
-            if (hostCheckInterval) clearInterval(hostCheckInterval); 
-            hostCheckInterval = setInterval(() => {
-                console.log(`Join screen (Guest): Still waiting for host...`);
-            }, 15000); // Check less often
+            try {
+                if (!isActive) return;
+                console.log('[handleWaitingForHost] Received data:', data);
+                setDebugMessage('Received waitingForHost event. Waiting...');
+                if (joinTimeout) clearTimeout(joinTimeout);
+                setUiStatus('waiting'); 
+                setError(null);
+                if (hostCheckInterval) clearInterval(hostCheckInterval); 
+                hostCheckInterval = setInterval(() => {
+                    console.log(`Join screen (Guest): Still waiting for host...`);
+                }, 15000); 
+            } catch (e: any) {
+                console.error('[handleWaitingForHost] Error processing event:', e);
+                setDebugMessage(`Error in waitingForHost handler: ${e?.message || 'Unknown error'}`);
+                // Optionally set error state?
+            }
         };
 
         const handleError = (errorMessage: { message: string }) => {

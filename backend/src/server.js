@@ -247,8 +247,11 @@ function handleSocketConnection(socket) {
 
             console.log(`Token valid. Found User A socket ID: ${userA_SocketId}, HTTP-generated: ${isHttpGenerated}`);
 
-            // Check if User A is still connected
-            const userASocket = io.sockets.sockets.get(userA_SocketId);
+            // Check if User A is still connected (ensure we check the correct namespace)
+            const backendNamespace = io.of('/backend-temp'); // Get namespace instance
+            // const userASocket = io.sockets.sockets.get(userA_SocketId); // Old lookup
+            const userASocket = backendNamespace.sockets.get(userA_SocketId); // Lookup within namespace
+            console.log(`Lookup result for User A (${userA_SocketId}) in namespace ${backendNamespace.name}: ${userASocket ? 'Found' : 'Not Found'}`);
             
             if (!userASocket) {
                 // For HTTP-generated tokens without a connected User A,
