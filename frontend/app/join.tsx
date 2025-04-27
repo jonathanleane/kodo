@@ -83,6 +83,10 @@ export default function JoinChatScreen() {
       const userBLanguage = 'es'; 
       setMyLanguage(userBLanguage);
 
+      // Add log *before* calling connect
+      console.log('[join.tsx] Calling connect() from context...');
+      setDebugMessage('Calling connect()...'); 
+
       connect() // Call context connect
         .then((connectedSocket) => {
           if (!isActive) return; // Check if component is still mounted
@@ -145,7 +149,9 @@ export default function JoinChatScreen() {
         })
         .catch((err) => {
           if (!isActive) return;
-          setDebugMessage(`Socket connection failed: ${err.message}`);
+          // Add specific logging inside catch
+          console.error('[join.tsx] connect() promise rejected:', err);
+          setDebugMessage(`Socket connection promise rejected: ${err.message}`);
           console.error('Join screen (Guest): Connection failed:', err);
           setError(`Could not connect: ${err.message}`);
           setUiStatus('error');
