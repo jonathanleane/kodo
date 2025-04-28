@@ -581,7 +581,7 @@ export default function JoinChatScreen() {
                     <PaperText style={styles.typingIndicator}>Partner is typing...</PaperText>
                 ) : null}
             />
-            <View style={[styles.inputContainer, {backgroundColor: theme.colors.elevation.level2}]}> // Themed background
+            <View style={[styles.inputContainer, {backgroundColor: theme.colors.elevation.level2}]}> {/* Themed background (This was the issue) */}
                 <TextInput
                     style={[styles.input, {backgroundColor: theme.colors.background, color: theme.colors.onSurface, borderColor: theme.colors.outline}] }
                     value={inputText}
