@@ -15,7 +15,7 @@ import {
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import io, { Socket } from 'socket.io-client';
 import { DefaultEventsMap } from '@socket.io/component-emitter';
-import { Button as PaperButton, RadioButton, Text as PaperText } from 'react-native-paper';
+import { Button as PaperButton, RadioButton, Text as PaperText, IconButton } from 'react-native-paper';
 import { useSocket, AppSocket } from '../context/SocketContext'; // Import the hook and type
 import * as Localization from 'expo-localization'; // Import localization
 
@@ -38,19 +38,36 @@ const SUPPORTED_LANGUAGES = [
 ];
 
 // --- Message Bubble Component ---
-const MessageBubble = ({ message }: { message: any }) => {
+const MessageBubble = React.memo(({ message, myLanguage }: { message: any, myLanguage: string | null }) => {
+  const [showAlternate, setShowAlternate] = useState(false);
   const isSelf = message.sender === 'self';
+
+  // Determine primary and alternate text based on sender
+  const primaryText = isSelf ? message.original : message.translated;
+  const alternateText = isSelf ? message.translated : message.original;
+  const showTranslationToggle = message.original !== message.translated;
+
   return (
     <View style={[styles.messageRow, isSelf ? styles.messageRowSelf : styles.messageRowPartner]}>
       <View style={[styles.messageBubble, isSelf ? styles.messageBubbleSelf : styles.messageBubblePartner]}>
-        <Text style={styles.messageOriginal}>{message.original}</Text>
-        {message.original !== message.translated && (
-          <Text style={styles.messageTranslated}>({message.translated})</Text>
+        <View style={styles.messageContentRow}> 
+          <Text style={styles.messagePrimaryText}>{primaryText}</Text>
+          {showTranslationToggle && (
+              <IconButton
+                  icon="translate" // Or use another icon like "eye" or "swap-horizontal"
+                  size={16}
+                  style={styles.translateIcon}
+                  onPress={() => setShowAlternate(!showAlternate)}
+              />
+          )}
+        </View>
+        {showAlternate && showTranslationToggle && (
+          <Text style={styles.messageAlternateText}>({alternateText})</Text>
         )}
       </View>
     </View>
   );
-};
+});
 
 // --- Main Chat Screen / Join Handler ---
 export default function JoinChatScreen() {
@@ -487,7 +504,7 @@ export default function JoinChatScreen() {
             <FlatList
                 ref={flatListRef}
                 data={messages}
-                renderItem={({ item }) => <MessageBubble message={item} />}
+                renderItem={({ item }) => <MessageBubble message={item} myLanguage={myLanguage} />}
                 keyExtractor={(item) => item.id}
                 style={styles.messageList}
                 contentContainerStyle={{ paddingVertical: 10 }}
@@ -594,11 +611,11 @@ const styles = StyleSheet.create({
   },
   messageBubble: {
       maxWidth: '80%',
-      paddingVertical: 8, // Adjust padding
-      paddingHorizontal: 12, // Adjust padding
+      paddingVertical: 8,
+      paddingHorizontal: 12,
       borderRadius: 15,
-      elevation: 1, // Android shadow
-      shadowColor: '#000', // iOS shadow
+      elevation: 1,
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.15,
       shadowRadius: 1,
@@ -613,14 +630,25 @@ const styles = StyleSheet.create({
       marginRight: 'auto',
       borderBottomLeftRadius: 0,
   },
-  messageOriginal: {
-      fontSize: 16,
+  messageContentRow: { // New style for text + icon
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  messageTranslated: {
+  messagePrimaryText: { // Renamed from messageOriginal
+      fontSize: 16,
+      flexShrink: 1, // Allow text to shrink if icon takes space
+      marginRight: 4, // Space between text and icon
+  },
+  messageAlternateText: { // Renamed from messageTranslated
       fontSize: 14,
       color: '#555',
       fontStyle: 'italic',
       marginTop: 3,
+  },
+  translateIcon: {
+      margin: -4, // Reduce default margins/padding of IconButton
+      height: 20, // Adjust height if needed
+      width: 20,  // Adjust width if needed
   },
   partnerLeftBanner: {
       padding: 10,
