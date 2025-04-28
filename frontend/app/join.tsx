@@ -15,8 +15,8 @@ import {
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import io, { Socket } from 'socket.io-client';
 import { DefaultEventsMap } from '@socket.io/component-emitter';
-import { Button as PaperButton, RadioButton } from 'react-native-paper';
-import { useSocket } from '../context/SocketContext'; // Import the hook
+import { Button as PaperButton, RadioButton, Text as PaperText } from 'react-native-paper';
+import { useSocket, AppSocket } from '../context/SocketContext'; // Import the hook and type
 import * as Localization from 'expo-localization'; // Import localization
 
 // Backend URL configuration
@@ -64,8 +64,9 @@ export default function JoinChatScreen() {
   // State Management
   const [uiStatus, setUiStatus] = useState('idle'); // idle, selecting_language, connecting, waiting, joined, error
   const [roomId, setRoomId] = useState<string | null>(passedRoomId || null);
-  // --- Language State (Guest) --- 
+  // --- Language State (Guest) ---
   const defaultLanguage = Localization.getLocales()[0]?.languageCode || 'en';
+  // Initialize with default, host value comes later if applicable
   const [myLanguage, setMyLanguage] = useState<string>(SUPPORTED_LANGUAGES.find(l => l.value === defaultLanguage) ? defaultLanguage : 'en');
   // -----------------------------
   const [partnerLanguage, setPartnerLanguage] = useState<string | null>(passedPartnerLanguage || null);
@@ -74,7 +75,7 @@ export default function JoinChatScreen() {
   const [partnerLeft, setPartnerLeft] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [debugMessage, setDebugMessage] = useState<string>('Initializing...');
-  const [isReconnecting, setIsReconnecting] = useState(false); // Track reconnection attempts
+  const [isReconnecting, setIsReconnecting] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const { socket, connect, disconnect, isConnected } = useSocket();
   const connectionAttempted = useRef(false);
@@ -386,7 +387,8 @@ export default function JoinChatScreen() {
   // Handler for confirming language selection
   const handleConfirmLanguage = () => {
       console.log(`Language confirmed: ${myLanguage}. Proceeding to connect.`);
-      setUiStatus('connecting'); // Trigger connection useEffect
+      setDebugMessage('Language confirmed. Connecting...'); // Update debug
+      setUiStatus('connecting'); // Trigger connection effects
   };
 
   // --- Render Logic ---
@@ -394,12 +396,12 @@ export default function JoinChatScreen() {
   if (uiStatus === 'selecting_language') {
       return (
           <View style={styles.centerStatus}>
-              <Text style={styles.statusText}>Select Your Language:</Text>
-              <RadioButton.Group onValueChange={newValue => setMyLanguage(newValue)} value={myLanguage}>
+              <PaperText variant="titleMedium" style={{marginBottom: 15}}>Select Your Language:</PaperText>
+              <RadioButton.Group onValueChange={(newValue: string) => setMyLanguage(newValue)} value={myLanguage}>
                  {SUPPORTED_LANGUAGES.map(lang => (
                     <View key={lang.value} style={styles.radioButtonRow}>
                        <RadioButton value={lang.value} />
-                       <Text>{lang.label}</Text>
+                       <PaperText>{lang.label}</PaperText>
                     </View>
                  ))}
               </RadioButton.Group>

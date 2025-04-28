@@ -14,7 +14,8 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 // import * as Network from 'expo-network'; // To get IP address
 // import { DefaultEventsMap } from '@socket.io/component-emitter'; // Type comes from context
 import * as Localization from 'expo-localization'; // Import localization
-import { Picker } from '@react-native-picker/picker'; // Simple picker
+// import { Picker } from '@react-native-picker/picker'; // Use RadioButton instead
+import { Button as PaperButton, RadioButton, Text as PaperText } from 'react-native-paper'; // Import Paper components
 
 // Use environment variables provided by the build environment
 // Fallback to hardcoded values only if environment variables are not set (useful for local dev without .env)
@@ -43,81 +44,75 @@ console.log('Using FRONTEND_URL:', FRONTEND_URL);
 export default function GenerateQRScreen() {
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('Initializing...');
+  const [status, setStatus] = useState<string>('selecting_language'); // Start with language selection
   const [error, setError] = useState<string | null>(null);
-  // --- Language State --- 
+  // Language State 
   const defaultLanguage = Localization.getLocales()[0]?.languageCode || 'en';
   const [myLanguage, setMyLanguage] = useState<string>(SUPPORTED_LANGUAGES.find(l => l.value === defaultLanguage) ? defaultLanguage : 'en');
-  // -------------------
+  const [languageConfirmed, setLanguageConfirmed] = useState(false); // Track confirmation
   const { socket, connect, disconnect, isConnected } = useSocket();
-  const hasFetchedToken = useRef(false);
-  const hasConnectedSocket = useRef(false);
+  const hasInitiatedProcess = useRef(false); // Track if fetch/connect started
 
   const webAppBaseUrl = FRONTEND_URL;
   const navigation = useNavigation();
 
+  // Effect 1: Fetch token and connect socket AFTER language is confirmed
   useEffect(() => {
-    if (hasFetchedToken.current) return;
-    hasFetchedToken.current = true; 
-
-    console.log(`Generate QR Screen: Fetching token for language: ${myLanguage}`);
-    setStatus('Requesting QR Code...');
-    setError(null);
-
-    let fetchedToken: string | null = null;
-
-    fetch(`${BACKEND_URL}/generate-qr`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ useHttp: true, language: myLanguage })
-    })
-    .then(response => {
-      if (!response.ok) throw new Error(`Server returned ${response.status}`);
-      return response.json();
-    })
-    .then(data => {
-      fetchedToken = data.token;
-      if (!fetchedToken) throw new Error('Backend did not provide a token.');
+    // Only run if language confirmed, not already connected, and process not initiated
+    if (languageConfirmed && !isConnected && !hasInitiatedProcess.current) { 
+      hasInitiatedProcess.current = true; 
       
-      console.log('Token received:', fetchedToken);
-      setQrToken(fetchedToken);
-      const joinUrl = `${webAppBaseUrl}/join?token=${fetchedToken}`;
-      setQrUrl(joinUrl);
-      console.log("Generated QR URL:", joinUrl);
-      setStatus('Connecting to chat service...');
-      
-      if (!isConnected && !hasConnectedSocket.current) {
-          hasConnectedSocket.current = true;
-          return connect();
-      }
-      return Promise.resolve(socket);
-    })
-    .then((connectedSocket) => {
-        if (!connectedSocket) throw new Error("Socket connection failed or wasn't available.");
-        console.log('Socket connected via context, ID:', connectedSocket.id);
-        hasConnectedSocket.current = true;
-    })
-    .catch(err => {
-      console.error('Error during token generation or initial socket connection:', err);
-      setError(`Setup failed: ${err.message}`);
-      setStatus('Error');
-      hasFetchedToken.current = false;
-      hasConnectedSocket.current = false;
-    });
+      console.log(`Generate QR Screen: Language ${myLanguage} confirmed. Fetching token...`);
+      setStatus('Requesting QR Code...');
+      setError(null);
 
-    return () => {
-      console.log("GenerateQRScreen: Unmounting token fetch/connect effect");
-    };
-  }, [connect, myLanguage, isConnected, socket]);
+      let fetchedToken: string | null = null;
 
+      // Send language preference when fetching token
+      fetch(`${BACKEND_URL}/generate-qr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ useHttp: true, language: myLanguage })
+      })
+      .then(response => {
+        if (!response.ok) throw new Error(`Server returned ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        fetchedToken = data.token;
+        if (!fetchedToken) throw new Error('Backend did not provide a token.');
+        
+        console.log('Token received:', fetchedToken);
+        setQrToken(fetchedToken); 
+        const joinUrl = `${webAppBaseUrl}/join?token=${fetchedToken}`;
+        setQrUrl(joinUrl);
+        console.log("Generated QR URL:", joinUrl);
+        setStatus('Connecting to chat service...');
+        
+        // Connect socket
+        return connect(); 
+      })
+      .then((connectedSocket) => {
+          if (!connectedSocket) throw new Error("Socket connection failed or wasn't available.");
+          console.log('Socket connected via context, ID:', connectedSocket.id);
+          // Status updated by Effect 2
+      })
+      .catch(err => {
+        console.error('Error during token generation or initial socket connection:', err);
+        setError(`Setup failed: ${err.message}`);
+        setStatus('Error');
+        hasInitiatedProcess.current = false; // Allow retry by confirming language again?
+        setLanguageConfirmed(false); // Go back to language selection on error
+      });
+    }
+    // Dependencies: Trigger when language is confirmed or connection status changes
+  }, [languageConfirmed, isConnected, connect, myLanguage]); 
+
+  // Effect 2: Set up socket listeners (mostly unchanged, runs when connected)
   useEffect(() => {
     if (isConnected && socket && qrToken) {
       console.log(`[Effect 2] Running: Socket connected, token available. Language: ${myLanguage}`);
-      
-      console.log(`[Effect 2] Setting status to: Listening for partner...`);
       setStatus('Listening for partner... (Scan QR Code)');
-      console.log(`[Effect 2] Status *should* be: Listening for partner...`);
-
       console.log(`[Effect 2] Emitting listenForToken for token: ${qrToken} with language ${myLanguage}`);
       socket.emit('listenForToken', { token: qrToken, language: myLanguage });
 
@@ -153,45 +148,63 @@ export default function GenerateQRScreen() {
     } else {
         console.log(`[Effect 2] Skipped: isConnected=${isConnected}, socket exists=${!!socket}, qrToken exists=${!!qrToken}`);
     }
-  }, [isConnected, socket, qrToken, router, myLanguage]);
+  }, [isConnected, socket, qrToken, router, myLanguage]); 
+
+  // Handler for confirm button
+  const handleConfirmLanguage = () => {
+      console.log("Language confirmed:", myLanguage);
+      setLanguageConfirmed(true);
+  };
 
   // Log state variables just before rendering
   console.log(`[Render] Status: "${status}", QR URL Ready: ${!!qrUrl}, Error: ${error}`);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.status}>{status}</Text>
-      {/* Language Picker - Show only initially */}
-      {status === 'Initializing...' || status === 'Requesting QR Code...' ? (
-          <View style={styles.pickerContainer}>
-              <Text>Select Your Language:</Text>
-              <Picker
-                  selectedValue={myLanguage}
-                  style={styles.picker}
-                  onValueChange={(itemValue: string) => setMyLanguage(itemValue)}
+      <PaperText variant="headlineSmall" style={styles.status}>{status}</PaperText>
+      
+      {/* Language Picker - Show only before confirmation */}
+      {!languageConfirmed && status === 'selecting_language' ? (
+          <View style={styles.languageSelectContainer}>
+              <PaperText variant="titleMedium">Select Your Language:</PaperText>
+              <RadioButton.Group onValueChange={(newValue: string) => setMyLanguage(newValue)} value={myLanguage}>
+                 {SUPPORTED_LANGUAGES.map(lang => (
+                    <View key={lang.value} style={styles.radioButtonRow}>
+                       <RadioButton value={lang.value} />
+                       <PaperText>{lang.label}</PaperText>
+                    </View>
+                 ))}
+              </RadioButton.Group>
+              <PaperButton 
+                  mode="contained" 
+                  onPress={handleConfirmLanguage} 
+                  style={{marginTop: 20}}
               >
-                  {SUPPORTED_LANGUAGES.map((lang) => (
-                      <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
-                  ))}
-              </Picker>
+                  Confirm & Generate QR
+              </PaperButton>
           </View>
       ) : null}
-      {error && <Text style={styles.errorText}>{error}</Text>}
+
+      {error && <PaperText style={styles.errorText}>{error}</PaperText>}
+      
+      {/* QR Code - Show only when listening */}
       {qrUrl && status === 'Listening for partner... (Scan QR Code)' && !error ? (
-        <View style={styles.qrContainer}>
+        <View style={styles.qrContainer}> 
           <QRCode
             value={qrUrl}
             size={250}
             color="black"
             backgroundColor="white"
           />
-          <Text style={styles.info}>Ask your chat partner to scan this code using their phone's camera.</Text>
+          <PaperText style={styles.info}>Ask your chat partner to scan this code using their phone's camera.</PaperText>
         </View>
-      ) : (
-        !error && status !== 'Initializing...' && status !== 'Requesting QR Code...' && (
-            <ActivityIndicator size="large" color="#007AFF" />
-        )
-      )}
+      ) : null} 
+      
+      {/* Spinner - Show during intermediate states after language confirmation */}
+      {(status === 'Requesting QR Code...' || status === 'Connecting to chat service...') && !error ? (
+        <ActivityIndicator size="large" style={{marginTop: 30}} />
+      ) : null}
+
     </View>
   );
 }
@@ -200,24 +213,44 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start', // Align top
     padding: 20,
+    paddingTop: 40, // Add padding top
     backgroundColor: '#f5f5f5'
   },
   status: {
-    fontSize: 18,
-    marginBottom: 20,
+    // fontSize: 18, // Use Paper variant instead
+    marginBottom: 30,
     textAlign: 'center'
   },
    errorText: {
         color: 'red',
+        marginTop: 20, // Add margin top
         marginBottom: 20,
         textAlign: 'center',
         fontWeight: 'bold'
     },
-  qrContainer: {
+  languageSelectContainer: {
+      width: '90%',
+      maxWidth: 400,
+      alignItems: 'center',
+      marginBottom: 20,
+      padding: 20,
+      backgroundColor: 'white',
+      borderRadius: 8,
+      elevation: 2,
+  },
+  radioButtonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+      width: '80%',
+      justifyContent: 'flex-start',
+  },
+  qrContainer: { 
     alignItems: 'center',
-    marginBottom: 20,
+    marginTop: 20, // Add margin top
+    marginBottom: 20, 
   },
   info: {
       marginTop: 30,
@@ -226,20 +259,5 @@ const styles = StyleSheet.create({
       color: 'grey',
       paddingHorizontal: 10,
   },
-  debugText: {
-      fontSize: 12,
-      color: '#888',
-      marginTop: 5,
-  },
-  pickerContainer: {
-      width: '80%',
-      marginBottom: 20,
-      alignItems: 'center', 
-  },
-  picker: {
-      height: 50,
-      width: '100%',
-      backgroundColor: '#FFF', // Optional styling
-      marginTop: 5, 
-  }
+  // Remove picker styles, debugText styles if no longer needed
 }); 
