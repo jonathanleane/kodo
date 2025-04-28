@@ -158,12 +158,14 @@ app.post('/generate-qr', async (req, res) => {
     // For HTTP-based flow, we don't need a socket ID, just store a placeholder
     // We'll use a much longer TTL for HTTP-based flow
     const requestingSocketId = req.body.socketId || req.headers['x-socket-id'] || 'http-generated';
+    const hostLanguage = req.body.language || 'en'; // Get language from request, default 'en'
 
     // Generate a secure random token
     const token = crypto.randomBytes(16).toString('hex');
     const tokenKey = `qr_token:${token}`;
     const tokenData = JSON.stringify({ 
         requestingUserId: requestingSocketId,
+        hostLanguage: hostLanguage, // Store host language
         createdAt: Date.now(),
         useHttp: useHttp
     });
@@ -270,8 +272,11 @@ function handleSocketConnection(socket) {
                     
                     // Store room info in Redis with the token as part of the key
                     const roomKey = `room:${roomId}`;
-                    const userB_Language = language;
                     
+                    // Get User A's language from the token data stored earlier
+                    const userA_Language = tokenData.hostLanguage || 'en'; // Use stored lang, default 'en'
+                    const userB_Language = language; // Language sent by User B
+
                     const roomData = JSON.stringify({
                         token: token,
                         userB: { socketId: clientB_SocketId, language: userB_Language },
@@ -319,8 +324,9 @@ function handleSocketConnection(socket) {
 
             // 4. Store room info (participants, languages) in Redis
             const roomKey = `room:${roomId}`;
-            // TODO: Get User A's language (needs to be sent when requesting QR or stored earlier)
-            const userA_Language = 'en'; // Placeholder for User A's language
+            
+            // Get User A's language from the token data stored earlier
+            const userA_Language = tokenData.hostLanguage || 'en'; // Use stored lang, default 'en'
             const userB_Language = language; // Language sent by User B
 
             const roomData = JSON.stringify({
@@ -390,8 +396,10 @@ function handleSocketConnection(socket) {
     });
     
     // Register to listen for a specific token (for HTTP-generated tokens)
-    socket.on('listenForToken', async ({ token }) => {
-        console.log(`Socket ${socket.id} is now listening for token: ${token}`);
+    // Include language from client
+    socket.on('listenForToken', async ({ token, language }) => {
+        const hostLanguage = language || 'en'; // Get language, default 'en'
+        console.log(`Socket ${socket.id} is now listening for token: ${token} with language: ${hostLanguage}`);
         try {
             // Update the token data to include this socket
             const tokenKey = `qr_token:${token}`;
@@ -399,9 +407,10 @@ function handleSocketConnection(socket) {
             
             if (existingData) {
                 const parsedData = JSON.parse(existingData);
-                parsedData.requestingUserId = socket.id;
+                parsedData.requestingUserId = socket.id; // Update socket ID
+                parsedData.hostLanguage = hostLanguage; // Update/store host language
                 await redisClient.set(tokenKey, JSON.stringify(parsedData), { EX: 600 });
-                console.log(`Updated token ${token} to use socket ${socket.id} with TTL 600s`);
+                console.log(`Updated token ${token} to use socket ${socket.id} and language ${hostLanguage} with TTL 600s`);
                 
                 // Check if there are any pending rooms for this token
                 // This is the key part - we need to find if anyone has already joined with this token
@@ -427,11 +436,11 @@ function handleSocketConnection(socket) {
                             const userB_SocketId = userB.socketId;
                             const userB_Language = userB.language;
                             
-                            // Update room data to include host info
+                            // Update room data to include host info AND LANGUAGE
                             parsedRoomData.pendingUserA = false;
                             parsedRoomData.userA = {
                                 socketId: socket.id,
-                                language: 'en' // Default language for host
+                                language: hostLanguage // Use language received from client
                             };
                             
                             // Save updated room data
@@ -448,14 +457,14 @@ function handleSocketConnection(socket) {
                                 console.log(`Notifying client ${userB_SocketId} that host has connected`);
                                 clientBSocket.emit('joinedRoom', {
                                     roomId: roomId,
-                                    partnerLanguage: 'en' // Default language for host
+                                    partnerLanguage: hostLanguage // Send host's language to B
                                 });
                             }
                             
                             // Also notify the host
                             socket.emit('joinedRoom', {
                                 roomId: roomId,
-                                partnerLanguage: userB_Language
+                                partnerLanguage: userB_Language // Send B's language to host
                             });
                             
                             break; // Stop after finding the first matching room
@@ -539,7 +548,8 @@ function handleSocketConnection(socket) {
 
             if (senderLang !== targetLang) { // Only translate if languages differ
                 try {
-                    const prompt = `Translate the following text from ${senderLang} to ${targetLang}. Output only the translated text, without any additional explanation or introduction.`;
+                    // Enhanced Prompt
+                    const prompt = `You are an expert multilingual translator specializing in real-time, natural-sounding conversational text. Translate the following user message accurately from ${senderLang} to ${targetLang}. Preserve the original tone, nuance, and idiomatic expressions where appropriate for a casual chat context. IMPORTANT: Output *only* the translated text, with no introduction, explanation, quotation marks, or labels.`;
                     console.log(`Sending to OpenAI: Model=${process.env.OPENAI_MODEL || 'gpt-4o'}, Prompt="${prompt}", Text="${messageText}"`);
 
                     if (!openai) {
