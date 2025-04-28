@@ -18,6 +18,7 @@ import { DefaultEventsMap } from '@socket.io/component-emitter';
 import { Button as PaperButton, RadioButton, Text as PaperText, IconButton } from 'react-native-paper';
 import { useSocket, AppSocket } from '../context/SocketContext'; // Import the hook and type
 import * as Localization from 'expo-localization'; // Import localization
+import { formatDistanceToNow } from 'date-fns'; // Import date-fns function
 
 // Backend URL configuration
 // const BACKEND_URL = 'https://kodo-production.up.railway.app'; // REMOVE THIS - Provided by context
@@ -55,6 +56,11 @@ const MessageBubble = React.memo(({ message, myLanguage }: { message: any, myLan
   const primaryText = isSelf ? message.original : message.translated;
   const alternateText = isSelf ? message.translated : message.original;
   const showTranslationToggle = message.original !== message.translated;
+  
+  // Format timestamp if available
+  const formattedTimestamp = message.timestamp
+    ? formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })
+    : '';
 
   return (
     <View style={[styles.messageRow, isSelf ? styles.messageRowSelf : styles.messageRowPartner]}>
@@ -73,6 +79,10 @@ const MessageBubble = React.memo(({ message, myLanguage }: { message: any, myLan
         {showAlternate && showTranslationToggle && (
           <Text style={styles.messageAlternateText}>({alternateText})</Text>
         )}
+        {/* Display Timestamp */}
+        <Text style={isSelf ? styles.timestampSelf : styles.timestampPartner}>
+          {formattedTimestamp}
+        </Text>
       </View>
     </View>
   );
@@ -289,12 +299,17 @@ export default function JoinChatScreen() {
     // --- Define Event Handlers ---
     const handleNewMessage = (message: any) => {
         if (!isActive) return;
-        // If partner sent a message, they definitely stopped typing
         if (message.sender === 'partner') {
             setIsPartnerTyping(false);
         }
         console.log('Chat message received:', message);
-        setMessages((prevMessages) => [...prevMessages, { ...message, id: Date.now().toString() + Math.random() }]);
+        // Add timestamp when adding message to state
+        const messageWithTimestamp = {
+             ...message, 
+             id: Date.now().toString() + Math.random(), // Keep existing ID generation
+             timestamp: Date.now() // Add current timestamp
+        };
+        setMessages((prevMessages) => [...prevMessages, messageWithTimestamp]);
     };
     const handlePartnerLeft = () => {
         if (!isActive) return;
@@ -679,16 +694,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  messagePrimaryText: { // Renamed from messageOriginal
+  messagePrimaryText: { 
       fontSize: 16,
-      flexShrink: 1, // Allow text to shrink if icon takes space
-      marginRight: 4, // Space between text and icon
+      flexShrink: 1, 
+      marginRight: 4, 
   },
-  messageAlternateText: { // Renamed from messageTranslated
+  messageAlternateText: { 
       fontSize: 14,
       color: '#555',
       fontStyle: 'italic',
       marginTop: 3,
+  },
+  timestampSelf: { // Style for timestamp
+      fontSize: 10,
+      color: '#666',
+      marginTop: 4, 
+      textAlign: 'right', // Align self timestamp right
+  },
+   timestampPartner: { // Style for timestamp
+      fontSize: 10,
+      color: '#666',
+      marginTop: 4, 
+      textAlign: 'left', // Align partner timestamp left
   },
   translateIcon: {
       margin: -4, // Reduce default margins/padding of IconButton
