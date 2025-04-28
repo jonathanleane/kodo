@@ -15,10 +15,11 @@ import {
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import io, { Socket } from 'socket.io-client';
 import { DefaultEventsMap } from '@socket.io/component-emitter';
-import { Button as PaperButton, RadioButton, Text as PaperText, IconButton } from 'react-native-paper';
+import { Button as PaperButton, Text as PaperText, IconButton } from 'react-native-paper';
 import { useSocket, AppSocket } from '../context/SocketContext'; // Import the hook and type
 import * as Localization from 'expo-localization'; // Import localization
 import { formatDistanceToNow } from 'date-fns'; // Import date-fns function
+import { Picker } from '@react-native-picker/picker'; // Use Picker
 
 // Backend URL configuration
 // const BACKEND_URL = 'https://kodo-production.up.railway.app'; // REMOVE THIS - Provided by context
@@ -472,14 +473,17 @@ export default function JoinChatScreen() {
       return (
           <View style={styles.centerStatus}>
               <PaperText variant="titleMedium" style={{marginBottom: 15}}>Select Your Language:</PaperText>
-              <RadioButton.Group onValueChange={(newValue: string) => setMyLanguage(newValue)} value={myLanguage}>
-                 {SUPPORTED_LANGUAGES.map(lang => (
-                    <View key={lang.value} style={styles.radioButtonRow}>
-                       <RadioButton value={lang.value} />
-                       <PaperText>{lang.label}</PaperText>
-                    </View>
-                 ))}
-              </RadioButton.Group>
+              <View style={styles.pickerWrapper}> 
+                <Picker
+                  selectedValue={myLanguage}
+                  style={styles.picker}
+                  onValueChange={(newValue: string) => setMyLanguage(newValue)}
+                >
+                  {SUPPORTED_LANGUAGES.map(lang => (
+                    <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
+                  ))}
+                </Picker>
+              </View>
               <PaperButton 
                   mode="contained" 
                   onPress={handleConfirmLanguage} 
@@ -755,12 +759,18 @@ const styles = StyleSheet.create({
       marginLeft: 10,
       fontWeight: 'bold',
   },
-  radioButtonRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8, // Add some spacing
-      width: '60%', // Adjust width as needed
-      justifyContent: 'flex-start', // Align items
+  pickerWrapper: { // Style for Picker wrapper (copied from generate.tsx)
+    width: '80%',
+    marginTop: 10,
+    marginBottom: 10,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
+    backgroundColor: 'white',
+  },
+  picker: { // Style for Picker itself (copied from generate.tsx)
+      height: 50,
+      width: '100%',
   },
   typingIndicator: {
       paddingHorizontal: 15,

@@ -15,8 +15,8 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 // import * as Network from 'expo-network'; // To get IP address
 // import { DefaultEventsMap } from '@socket.io/component-emitter'; // Type comes from context
 import * as Localization from 'expo-localization'; // Import localization
-// import { Picker } from '@react-native-picker/picker'; // Use RadioButton instead
-import { Button as PaperButton, RadioButton, Text as PaperText } from 'react-native-paper'; // Import Paper components
+import { Button as PaperButton, Text as PaperText } from 'react-native-paper'; // Remove RadioButton
+import { Picker } from '@react-native-picker/picker'; // Use Picker
 import * as Clipboard from 'expo-clipboard'; // Import clipboard
 
 // Use environment variables provided by the build environment
@@ -200,14 +200,17 @@ export default function GenerateQRScreen() {
       {!languageConfirmed && status === 'selecting_language' ? (
           <View style={styles.languageSelectContainer}>
               <PaperText variant="titleMedium">Select Your Language:</PaperText>
-              <RadioButton.Group onValueChange={(newValue: string) => setMyLanguage(newValue)} value={myLanguage}>
-                 {SUPPORTED_LANGUAGES.map(lang => (
-                    <View key={lang.value} style={styles.radioButtonRow}>
-                       <RadioButton value={lang.value} />
-                       <PaperText>{lang.label}</PaperText>
-                    </View>
-                 ))}
-              </RadioButton.Group>
+              <View style={styles.pickerWrapper}> 
+                <Picker
+                    selectedValue={myLanguage}
+                    style={styles.picker}
+                    onValueChange={(itemValue: string) => setMyLanguage(itemValue)}
+                >
+                    {SUPPORTED_LANGUAGES.map(lang => (
+                        <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
+                    ))}
+                </Picker>
+              </View>
               <PaperButton 
                   mode="contained" 
                   onPress={handleConfirmLanguage} 
@@ -280,12 +283,19 @@ const styles = StyleSheet.create({
       borderRadius: 8,
       elevation: 2,
   },
-  radioButtonRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 8,
-      width: '80%',
-      justifyContent: 'flex-start',
+  pickerWrapper: { // Style for Picker wrapper (for background/border)
+    width: '80%',
+    marginTop: 10,
+    marginBottom: 10,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
+    backgroundColor: 'white',
+  },
+  picker: { // Style for Picker itself
+      height: 50,
+      width: '100%',
+      // backgroundColor: '#FFF', // Background on wrapper instead
   },
   qrContainer: { 
     alignItems: 'center',
