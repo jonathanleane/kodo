@@ -27,8 +27,17 @@ const SUPPORTED_LANGUAGES = [
   { label: 'English', value: 'en' },
   { label: 'Español', value: 'es' },
   { label: 'Français', value: 'fr' },
+  { label: 'Deutsch', value: 'de' },
+  { label: 'Italiano', value: 'it' },
+  { label: 'Português', value: 'pt' },
+  { label: 'Русский', value: 'ru' },
+  { label: '中文 (简体)', value: 'zh' }, // Or just 'zh-CN' if needed, API usually handles base 'zh'
+  { label: '日本語', value: 'ja' },
+  { label: '한국어', value: 'ko' },
+  { label: 'العربية', value: 'ar' },
+  { label: 'हिन्दी', value: 'hi' },
   { label: 'Bahasa Indonesia', value: 'id' },
-  // Add more as needed
+  { label: 'Tagalog (Filipino)', value: 'tl' },
 ];
 
 // HARDCODE for now to ensure correct URL is used
@@ -113,42 +122,52 @@ export default function GenerateQRScreen() {
     if (isConnected && socket && qrToken) {
       console.log(`[Effect 2] Running: Socket connected, token available. Language: ${myLanguage}`);
       setStatus('Listening for partner... (Scan QR Code)');
-      console.log(`[Effect 2] Emitting listenForToken for token: ${qrToken} with language ${myLanguage}`);
-      socket.emit('listenForToken', { token: qrToken, language: myLanguage });
+      console.log(`[Effect 2] Status *should* be: Listening for partner...`); 
 
+      // Emit listenForToken now that we are connected and have the token AND LANGUAGE
+      console.log(`[Effect 2] Emitting listenForToken for token: ${qrToken} with language ${myLanguage}`);
+      socket.emit('listenForToken', { token: qrToken, language: myLanguage }); // Send language
+
+      // Handler for joinedRoom event
       const handleJoinedRoom = ({ roomId, partnerLanguage }: { roomId: string; partnerLanguage: string }) => {
         console.log(`[handleJoinedRoom] Triggered. My lang: ${myLanguage}, Partner Lang: ${partnerLanguage}. Setting status to: Partner joined! Navigating...`);
-        setStatus('Partner joined! Navigating...');
+        setStatus('Partner joined! Navigating...'); 
         setTimeout(() => {
             console.log('[handleJoinedRoom] Navigating after delay...');
             router.push({
               pathname: '/join',
+              // Pass MY language to the chat screen
               params: { roomId, myLanguage: myLanguage, partnerLanguage, joined: 'true' }
             } as any);
-        }, 500);
+        }, 500); 
       };
       
+      // Handler for error event
       const handleError = (errorMessage: { message: string }) => {
           console.error('[handleError] Triggered. Error from server via socket:', errorMessage);
           setError(errorMessage.message || 'Server error during connection/wait');
           setStatus('Error listening for partner');
       };
 
+      // Add listeners
       console.log('[Effect 2] Adding socket listeners (joinedRoom, error)');
       socket.on('joinedRoom', handleJoinedRoom);
       socket.on('error', handleError);
 
+      // Cleanup listeners when effect re-runs or component unmounts
       return () => {
           console.log("[Effect 2 Cleanup] Cleaning up socket listeners");
+          // Check if socket still exists before removing listeners
           if(socket) {
             socket.off('joinedRoom', handleJoinedRoom);
             socket.off('error', handleError);
           }
       };
     } else {
+        // Log why this effect might not be running
         console.log(`[Effect 2] Skipped: isConnected=${isConnected}, socket exists=${!!socket}, qrToken exists=${!!qrToken}`);
     }
-  }, [isConnected, socket, qrToken, router, myLanguage]); 
+  }, [isConnected, socket, qrToken, router, myLanguage]); // Add myLanguage dependency
 
   // Handler for confirm button
   const handleConfirmLanguage = () => {
@@ -156,6 +175,7 @@ export default function GenerateQRScreen() {
       setLanguageConfirmed(true);
   };
 
+  // --- Render Logic --- 
   // Log state variables just before rendering
   console.log(`[Render] Status: "${status}", QR URL Ready: ${!!qrUrl}, Error: ${error}`);
 
@@ -185,7 +205,7 @@ export default function GenerateQRScreen() {
           </View>
       ) : null}
 
-      {error && <PaperText style={styles.errorText}>{error}</PaperText>}
+      {error && <PaperText style={styles.errorText}>{error}</Text>}
       
       {/* QR Code - Show only when listening */}
       {qrUrl && status === 'Listening for partner... (Scan QR Code)' && !error ? (

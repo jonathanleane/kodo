@@ -33,8 +33,17 @@ const SUPPORTED_LANGUAGES = [
   { label: 'English', value: 'en' },
   { label: 'Español', value: 'es' },
   { label: 'Français', value: 'fr' },
+  { label: 'Deutsch', value: 'de' },
+  { label: 'Italiano', value: 'it' },
+  { label: 'Português', value: 'pt' },
+  { label: 'Русский', value: 'ru' },
+  { label: '中文 (简体)', value: 'zh' }, 
+  { label: '日本語', value: 'ja' },
+  { label: '한국어', value: 'ko' },
+  { label: 'العربية', value: 'ar' },
+  { label: 'हिन्दी', value: 'hi' },
   { label: 'Bahasa Indonesia', value: 'id' },
-  // Add more as needed
+  { label: 'Tagalog (Filipino)', value: 'tl' },
 ];
 
 // --- Message Bubble Component ---
