@@ -17,6 +17,7 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 import * as Localization from 'expo-localization'; // Import localization
 // import { Picker } from '@react-native-picker/picker'; // Use RadioButton instead
 import { Button as PaperButton, RadioButton, Text as PaperText } from 'react-native-paper'; // Import Paper components
+import * as Clipboard from 'expo-clipboard'; // Import clipboard
 
 // Use environment variables provided by the build environment
 // Fallback to hardcoded values only if environment variables are not set (useful for local dev without .env)
@@ -60,6 +61,7 @@ export default function GenerateQRScreen() {
   const defaultLanguage = Localization.getLocales()[0]?.languageCode || 'en';
   const [myLanguage, setMyLanguage] = useState<string>(SUPPORTED_LANGUAGES.find(l => l.value === defaultLanguage) ? defaultLanguage : 'en');
   const [languageConfirmed, setLanguageConfirmed] = useState(false); // Track confirmation
+  const [linkCopied, setLinkCopied] = useState(false); // State for copy feedback
   const { socket, connect, disconnect, isConnected } = useSocket();
   const hasInitiatedProcess = useRef(false); // Track if fetch/connect started
 
@@ -176,6 +178,16 @@ export default function GenerateQRScreen() {
       setLanguageConfirmed(true);
   };
 
+  // --- Copy Link Handler ---
+  const copyToClipboard = async () => {
+    if (qrUrl) {
+      await Clipboard.setStringAsync(qrUrl);
+      setLinkCopied(true);
+      // Optionally reset after a delay
+      setTimeout(() => setLinkCopied(false), 2000); 
+    }
+  };
+
   // --- Render Logic --- 
   // Log state variables just before rendering
   console.log(`[Render] Status: "${status}", QR URL Ready: ${!!qrUrl}, Error: ${error}`);
@@ -218,6 +230,14 @@ export default function GenerateQRScreen() {
             backgroundColor="white"
           />
           <PaperText style={styles.info}>Ask your chat partner to scan this code using their phone's camera.</PaperText>
+          <PaperButton 
+              mode="outlined" // Use outlined or text style for secondary action
+              icon="content-copy"
+              onPress={copyToClipboard}
+              style={styles.copyButton}
+          >
+              {linkCopied ? 'Link Copied!' : 'Copy Invite Link'}
+          </PaperButton>
         </View>
       ) : null} 
       
@@ -278,5 +298,8 @@ const styles = StyleSheet.create({
       fontSize: 16,
       color: 'grey',
       paddingHorizontal: 10,
+  },
+  copyButton: {
+    marginTop: 15, 
   },
 }); 
