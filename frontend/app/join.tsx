@@ -15,8 +15,9 @@ import {
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import io, { Socket } from 'socket.io-client';
 import { DefaultEventsMap } from '@socket.io/component-emitter';
-import { Button as PaperButton } from 'react-native-paper';
+import { Button as PaperButton, RadioButton } from 'react-native-paper';
 import { useSocket } from '../context/SocketContext'; // Import the hook
+import * as Localization from 'expo-localization'; // Import localization
 
 // Backend URL configuration
 // const BACKEND_URL = 'https://kodo-production.up.railway.app'; // REMOVE THIS - Provided by context
@@ -26,6 +27,15 @@ import { useSocket } from '../context/SocketContext'; // Import the hook
 
 // Define the path for Socket.IO (standard path)
 const socketIoPath = "/socket.io";
+
+// Supported Languages (Example - should match generate.tsx)
+const SUPPORTED_LANGUAGES = [
+  { label: 'English', value: 'en' },
+  { label: 'Español', value: 'es' },
+  { label: 'Français', value: 'fr' },
+  { label: 'Bahasa Indonesia', value: 'id' },
+  // Add more as needed
+];
 
 // --- Message Bubble Component ---
 const MessageBubble = ({ message }: { message: any }) => {
@@ -48,33 +58,52 @@ export default function JoinChatScreen() {
   const token = params.token as string | undefined; // Token from URL
   const joined = params.joined === 'true'; // Flag if navigated from GenerateQR
   const passedRoomId = params.roomId as string;
-  const passedMyLanguage = params.myLanguage as string;
+  const passedMyLanguage = params.myLanguage as string; // This is HOST lang when navigated
   const passedPartnerLanguage = params.partnerLanguage as string;
 
   // State Management
-  const [uiStatus, setUiStatus] = useState('idle'); // idle, connecting, waiting, joined, error
+  const [uiStatus, setUiStatus] = useState('idle'); // idle, selecting_language, connecting, waiting, joined, error
   const [roomId, setRoomId] = useState<string | null>(passedRoomId || null);
-  const [myLanguage, setMyLanguage] = useState<string | null>(passedMyLanguage || null);
+  // --- Language State (Guest) --- 
+  const defaultLanguage = Localization.getLocales()[0]?.languageCode || 'en';
+  const [myLanguage, setMyLanguage] = useState<string>(SUPPORTED_LANGUAGES.find(l => l.value === defaultLanguage) ? defaultLanguage : 'en');
+  // -----------------------------
   const [partnerLanguage, setPartnerLanguage] = useState<string | null>(passedPartnerLanguage || null);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
   const [partnerLeft, setPartnerLeft] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugMessage, setDebugMessage] = useState<string>('Initializing...'); // For extra debug info
+  const [debugMessage, setDebugMessage] = useState<string>('Initializing...');
   const [isReconnecting, setIsReconnecting] = useState(false); // Track reconnection attempts
   const flatListRef = useRef<FlatList>(null);
-  const { socket, connect, disconnect, isConnected } = useSocket(); // Use context
-  const connectionAttempted = useRef(false); // Track if connection was initiated
-  const joinAttempted = useRef(false); // Track if join emit was attempted
+  const { socket, connect, disconnect, isConnected } = useSocket();
+  const connectionAttempted = useRef(false);
+  const joinAttempted = useRef(false);
 
-  // --- Effect 1: Ensure Connection (for guests) ---
+  // Set initial state based on navigation type
+  useEffect(() => {
+      if (token && !joined) {
+          setUiStatus('selecting_language'); // Start by asking for language
+          setDebugMessage('Please select your language.');
+      } else if (joined && passedRoomId) {
+          // Host navigated here
+          setMyLanguage(passedMyLanguage); // Host language passed via params
+          setPartnerLanguage(passedPartnerLanguage);
+          setRoomId(passedRoomId);
+          setUiStatus('joined'); // Already joined logically
+      } else {
+          setError("Invalid page state.");
+          setUiStatus('error');
+      }
+  }, [token, joined, passedRoomId]); // Only run once on mount based on initial params
+
+  // --- Effect 1: Ensure Connection (for guests, now runs AFTER language selection) ---
   useEffect(() => {
     let isActive = true;
-    console.log(`[Effect 1 Check] token: ${!!token}, joined: ${joined}, isConnected: ${isConnected}, connectionAttempted: ${connectionAttempted.current}`);
-    // Only attempt connection if joining via token, not connected, and not already attempted.
-    if (token && !joined && !isConnected && !connectionAttempted.current) {
+    console.log(`[Effect 1 Check] uiStatus: ${uiStatus}, isConnected: ${isConnected}, connectionAttempted: ${connectionAttempted.current}`);
+    // Only attempt connection if status is 'connecting', not connected, and not already attempted.
+    if (uiStatus === 'connecting' && !isConnected && !connectionAttempted.current) {
       connectionAttempted.current = true;
-      setUiStatus('connecting');
       setDebugMessage('Attempting to connect socket...');
       setError(null);
       console.log('[Effect 1] Calling connect()...');
@@ -97,25 +126,25 @@ export default function JoinChatScreen() {
     }
     
     return () => { isActive = false; };
-    // Dependencies: only need token/joined status and the stable connect function reference
-  }, [token, joined, connect]);
+  }, [uiStatus, isConnected, connect]); // Depends on uiStatus trigger now
   
   // --- Effect 2: Emit Join & Setup Listeners (for guests) ---
   useEffect(() => {
     let hostCheckInterval: NodeJS.Timeout | null = null;
     let joinTimeout: NodeJS.Timeout | null = null;
     let isActive = true;
-    console.log(`[Effect 2 Check] token: ${!!token}, joined: ${joined}, isConnected: ${isConnected}, socket: ${!!socket}, joinAttempted: ${joinAttempted.current}`);
+    console.log(`[Effect 2 Check] uiStatus: ${uiStatus}, token: ${!!token}, joined: ${joined}, isConnected: ${isConnected}, socket: ${!!socket}, joinAttempted: ${joinAttempted.current}`);
 
     // Only run if guest, connected, have token, and haven't tried joining yet
-    if (token && !joined && isConnected && socket && !joinAttempted.current) {
-        joinAttempted.current = true; // Mark join as attempted
-        setDebugMessage(`Socket ready (ID: ${socket.id}). Emitting join...`);
+    if (uiStatus === 'connecting' && token && !joined && isConnected && socket && !joinAttempted.current) {
+        joinAttempted.current = true; 
+        setDebugMessage(`Socket ready (ID: ${socket.id}). Emitting join with lang ${myLanguage}...`);
         setError(null);
         console.log('[Effect 2] Conditions met. Emitting join and adding listeners.');
 
-        const userBLanguage = 'es'; // TODO: Make dynamic
-        if (!myLanguage) setMyLanguage(userBLanguage);
+        // Use the language selected by the user
+        // const userBLanguage = 'es'; // Old hardcoded value
+        const userBLanguage = myLanguage;
         
         // --- Setup Listeners FIRST --- 
         const handleConnectionTest = (data: any) => {
@@ -177,9 +206,8 @@ export default function JoinChatScreen() {
         socket.on('error', handleError);
         // --- End Listeners Setup ---
 
-        // Emit the join event
-        console.log(`[Effect 2] >>>>>> BEFORE EMITTING join event with token ${token}`);
-        setDebugMessage(`Emitting join for token ${token}...`); // Update debug before emit
+        // Emit the join event WITH LANGUAGE
+        console.log(`[Effect 2] Emitting join event with token ${token} and lang ${userBLanguage}`);
         socket.emit('join', { token: token, language: userBLanguage });
         console.log(`[Effect 2] <<<<<< AFTER EMITTING join event with token ${token}`);
 
@@ -222,9 +250,8 @@ export default function JoinChatScreen() {
         setDebugMessage('Ready for chat (as host).');
     }
     
-    // Dependencies: Trigger when connection status changes or token/socket become available.
-    // Simplify dependencies to reduce potential re-runs
-  }, [token, joined, isConnected, socket, disconnect, passedRoomId, passedMyLanguage, passedPartnerLanguage]); // Removed myLanguage, uiStatus
+    // Dependencies: now includes myLanguage needed for the join emit
+  }, [uiStatus, token, joined, isConnected, socket, disconnect, passedRoomId, passedMyLanguage, passedPartnerLanguage, myLanguage]); 
 
   // --- Effect 3: Chat Logic (runs once connection status is 'joined') ---
   useEffect(() => {
@@ -356,9 +383,40 @@ export default function JoinChatScreen() {
     }
   }, [inputText, roomId, partnerLeft, socket]); // Add socket dependency
 
+  // Handler for confirming language selection
+  const handleConfirmLanguage = () => {
+      console.log(`Language confirmed: ${myLanguage}. Proceeding to connect.`);
+      setUiStatus('connecting'); // Trigger connection useEffect
+  };
+
   // --- Render Logic ---
+  // NEW: Language Selection state
+  if (uiStatus === 'selecting_language') {
+      return (
+          <View style={styles.centerStatus}>
+              <Text style={styles.statusText}>Select Your Language:</Text>
+              <RadioButton.Group onValueChange={newValue => setMyLanguage(newValue)} value={myLanguage}>
+                 {SUPPORTED_LANGUAGES.map(lang => (
+                    <View key={lang.value} style={styles.radioButtonRow}>
+                       <RadioButton value={lang.value} />
+                       <Text>{lang.label}</Text>
+                    </View>
+                 ))}
+              </RadioButton.Group>
+              <PaperButton 
+                  mode="contained" 
+                  onPress={handleConfirmLanguage} 
+                  style={{marginTop: 20}}
+              >
+                  Confirm & Join Chat
+              </PaperButton>
+              <Text style={styles.debugText}>Debug: {debugMessage}</Text>
+          </View>
+      );
+  }
+
   // Loading / Connecting / Waiting states
-  if (uiStatus === 'connecting' || uiStatus === 'waiting' || uiStatus === 'idle') {
+  if (uiStatus === 'connecting' || uiStatus === 'waiting') { // Removed idle state from here
     let statusMessage = 'Initializing...'; // Default for idle
     if (uiStatus === 'connecting') statusMessage = 'Connecting...';
     if (uiStatus === 'waiting') statusMessage = 'Waiting for host...';
@@ -594,5 +652,12 @@ const styles = StyleSheet.create({
       color: '#FFF',
       marginLeft: 10,
       fontWeight: 'bold',
+  },
+  radioButtonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8, // Add some spacing
+      width: '60%', // Adjust width as needed
+      justifyContent: 'flex-start', // Align items
   }
 }); 

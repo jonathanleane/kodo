@@ -13,11 +13,22 @@ import { router, useNavigation, Href } from 'expo-router';
 import { useSocket } from '../context/SocketContext'; // Import the hook
 // import * as Network from 'expo-network'; // To get IP address
 // import { DefaultEventsMap } from '@socket.io/component-emitter'; // Type comes from context
+import * as Localization from 'expo-localization'; // Import localization
+import { Picker } from '@react-native-picker/picker'; // Simple picker
 
 // Use environment variables provided by the build environment
 // Fallback to hardcoded values only if environment variables are not set (useful for local dev without .env)
 // const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://kodo-backend-production.up.railway.app'; 
 // const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://kodo-frontend-production.up.railway.app';
+
+// Supported Languages (Example)
+const SUPPORTED_LANGUAGES = [
+  { label: 'English', value: 'en' },
+  { label: 'Español', value: 'es' },
+  { label: 'Français', value: 'fr' },
+  { label: 'Bahasa Indonesia', value: 'id' },
+  // Add more as needed
+];
 
 // HARDCODE for now to ensure correct URL is used
 const BACKEND_URL = 'https://kodo-backend-s7vj.onrender.com'; // NEW Render Backend URL
@@ -34,6 +45,10 @@ export default function GenerateQRScreen() {
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('Initializing...');
   const [error, setError] = useState<string | null>(null);
+  // --- Language State --- 
+  const defaultLanguage = Localization.getLocales()[0]?.languageCode || 'en';
+  const [myLanguage, setMyLanguage] = useState<string>(SUPPORTED_LANGUAGES.find(l => l.value === defaultLanguage) ? defaultLanguage : 'en');
+  // -------------------
   const { socket, connect, disconnect, isConnected } = useSocket();
   const hasFetchedToken = useRef(false);
   const hasConnectedSocket = useRef(false);
@@ -45,7 +60,7 @@ export default function GenerateQRScreen() {
     if (hasFetchedToken.current) return;
     hasFetchedToken.current = true; 
 
-    console.log("Generate QR Screen: Fetching token...");
+    console.log(`Generate QR Screen: Fetching token for language: ${myLanguage}`);
     setStatus('Requesting QR Code...');
     setError(null);
 
@@ -54,7 +69,7 @@ export default function GenerateQRScreen() {
     fetch(`${BACKEND_URL}/generate-qr`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ useHttp: true })
+      body: JSON.stringify({ useHttp: true, language: myLanguage })
     })
     .then(response => {
       if (!response.ok) throw new Error(`Server returned ${response.status}`);
@@ -93,27 +108,27 @@ export default function GenerateQRScreen() {
     return () => {
       console.log("GenerateQRScreen: Unmounting token fetch/connect effect");
     };
-  }, [connect, isConnected, socket]);
+  }, [connect, myLanguage, isConnected, socket]);
 
   useEffect(() => {
     if (isConnected && socket && qrToken) {
-      console.log('[Effect 2] Running: Socket connected, token available.');
+      console.log(`[Effect 2] Running: Socket connected, token available. Language: ${myLanguage}`);
       
-      console.log('[Effect 2] Setting status to: Listening for partner...');
+      console.log(`[Effect 2] Setting status to: Listening for partner...`);
       setStatus('Listening for partner... (Scan QR Code)');
-      console.log('[Effect 2] Status *should* be: Listening for partner...');
+      console.log(`[Effect 2] Status *should* be: Listening for partner...`);
 
-      console.log('[Effect 2] Emitting listenForToken for token:', qrToken);
-      socket.emit('listenForToken', { token: qrToken });
+      console.log(`[Effect 2] Emitting listenForToken for token: ${qrToken} with language ${myLanguage}`);
+      socket.emit('listenForToken', { token: qrToken, language: myLanguage });
 
       const handleJoinedRoom = ({ roomId, partnerLanguage }: { roomId: string; partnerLanguage: string }) => {
-        console.log('[handleJoinedRoom] Triggered. Setting status to: Partner joined! Navigating...');
+        console.log(`[handleJoinedRoom] Triggered. My lang: ${myLanguage}, Partner Lang: ${partnerLanguage}. Setting status to: Partner joined! Navigating...`);
         setStatus('Partner joined! Navigating...');
         setTimeout(() => {
             console.log('[handleJoinedRoom] Navigating after delay...');
             router.push({
               pathname: '/join',
-              params: { roomId, myLanguage: 'en', partnerLanguage, joined: 'true' }
+              params: { roomId, myLanguage: myLanguage, partnerLanguage, joined: 'true' }
             } as any);
         }, 500);
       };
@@ -138,7 +153,7 @@ export default function GenerateQRScreen() {
     } else {
         console.log(`[Effect 2] Skipped: isConnected=${isConnected}, socket exists=${!!socket}, qrToken exists=${!!qrToken}`);
     }
-  }, [isConnected, socket, qrToken, router]);
+  }, [isConnected, socket, qrToken, router, myLanguage]);
 
   // Log state variables just before rendering
   console.log(`[Render] Status: "${status}", QR URL Ready: ${!!qrUrl}, Error: ${error}`);
@@ -146,6 +161,21 @@ export default function GenerateQRScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.status}>{status}</Text>
+      {/* Language Picker - Show only initially */}
+      {status === 'Initializing...' || status === 'Requesting QR Code...' ? (
+          <View style={styles.pickerContainer}>
+              <Text>Select Your Language:</Text>
+              <Picker
+                  selectedValue={myLanguage}
+                  style={styles.picker}
+                  onValueChange={(itemValue: string) => setMyLanguage(itemValue)}
+              >
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                      <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
+                  ))}
+              </Picker>
+          </View>
+      ) : null}
       {error && <Text style={styles.errorText}>{error}</Text>}
       {qrUrl && status === 'Listening for partner... (Scan QR Code)' && !error ? (
         <View style={styles.qrContainer}>
@@ -158,7 +188,9 @@ export default function GenerateQRScreen() {
           <Text style={styles.info}>Ask your chat partner to scan this code using their phone's camera.</Text>
         </View>
       ) : (
-        !error && <ActivityIndicator size="large" color="#007AFF" />
+        !error && status !== 'Initializing...' && status !== 'Requesting QR Code...' && (
+            <ActivityIndicator size="large" color="#007AFF" />
+        )
       )}
     </View>
   );
@@ -198,5 +230,16 @@ const styles = StyleSheet.create({
       fontSize: 12,
       color: '#888',
       marginTop: 5,
+  },
+  pickerContainer: {
+      width: '80%',
+      marginBottom: 20,
+      alignItems: 'center', 
+  },
+  picker: {
+      height: 50,
+      width: '100%',
+      backgroundColor: '#FFF', // Optional styling
+      marginTop: 5, 
   }
 }); 

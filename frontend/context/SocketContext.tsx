@@ -41,8 +41,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     console.log(`SocketContext: Attempting connection to ${BACKEND_URL}${SOCKET_NAMESPACE}...`);
     const newSocket = io(`${BACKEND_URL}${SOCKET_NAMESPACE}`, {
-      reconnectionAttempts: 5, // Sensible defaults
-      timeout: 60000, // Increase timeout to 60 seconds
+      reconnectionAttempts: 30, // Try for ~2-3 minutes before failing
+      timeout: 60000, // Keep increased timeout
       transports: ['websocket'], // FORCE WEBSOCKET ONLY
       path: '/socket.io',
       autoConnect: false, // Connect manually
