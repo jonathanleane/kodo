@@ -5,7 +5,8 @@ import {
     StyleSheet,
     ActivityIndicator,
     Alert,
-    Platform
+    Platform,
+    ScrollView
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 // import io, { Socket } from 'socket.io-client'; // No longer need direct import
@@ -180,7 +181,7 @@ export default function GenerateQRScreen() {
   console.log(`[Render] Status: "${status}", QR URL Ready: ${!!qrUrl}, Error: ${error}`);
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.scrollContainer}>
       <PaperText variant="headlineSmall" style={styles.status}>{status}</PaperText>
       
       {/* Language Picker - Show only before confirmation */}
@@ -225,27 +226,26 @@ export default function GenerateQRScreen() {
         <ActivityIndicator size="large" style={{marginTop: 30}} />
       ) : null}
 
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  scrollContainer: {
+    flexGrow: 1,
     alignItems: 'center',
-    justifyContent: 'flex-start', // Align top
+    justifyContent: 'center',
     padding: 20,
-    paddingTop: 40, // Add padding top
+    paddingTop: 40,
     backgroundColor: '#f5f5f5'
   },
   status: {
-    // fontSize: 18, // Use Paper variant instead
     marginBottom: 30,
     textAlign: 'center'
   },
    errorText: {
         color: 'red',
-        marginTop: 20, // Add margin top
+        marginTop: 20,
         marginBottom: 20,
         textAlign: 'center',
         fontWeight: 'bold'
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   },
   qrContainer: { 
     alignItems: 'center',
-    marginTop: 20, // Add margin top
+    marginTop: 20,
     marginBottom: 20, 
   },
   info: {
@@ -279,5 +279,4 @@ const styles = StyleSheet.create({
       color: 'grey',
       paddingHorizontal: 10,
   },
-  // Remove picker styles, debugText styles if no longer needed
 }); 
