@@ -205,7 +205,7 @@ export default function GenerateQRScreen() {
           </View>
       ) : null}
 
-      {error && <PaperText style={styles.errorText}>{error}</Text>}
+      {error && <PaperText style={styles.errorText}>{error}</PaperText>}
       
       {/* QR Code - Show only when listening */}
       {qrUrl && status === 'Listening for partner... (Scan QR Code)' && !error ? (
