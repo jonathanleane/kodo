@@ -210,18 +210,18 @@ console.log('Set up handlers for /backend-temp namespace');
 function handleSocketConnection(socket) {
     console.log(`Connection received! Socket ID: ${socket.id}, Transport: ${socket.conn.transport.name}`);
     // Log additional connection details for debugging
-    console.log(`Connection details - Handshake: ${JSON.stringify(socket.handshake.headers, null, 2)}`);
-    console.log(`Connection namespace: ${socket.nsp.name}`);
-    console.log(`Connection URL: ${socket.handshake.url}, Query: ${JSON.stringify(socket.handshake.query)}`);
+    // console.log(`Connection details - Handshake: ${JSON.stringify(socket.handshake.headers, null, 2)}`);
+    // console.log(`Connection namespace: ${socket.nsp.name}`);
+    // console.log(`Connection URL: ${socket.handshake.url}, Query: ${JSON.stringify(socket.handshake.query)}`);
 
     // Send immediate acknowledgment to client
-    socket.emit('server_ack', { status: 'connected', socketId: socket.id });
+    // socket.emit('server_ack', { status: 'connected', socketId: socket.id }); // Keep this?
     
     console.log(`User connected: ${socket.id}`);
     
-    // <<< ADD Simple Test Emit >>>
-    console.log(`Emitting connection_test to ${socket.id}`);
-    socket.emit('connection_test', { id: socket.id, message: 'Backend says hello!' });
+    // <<< REMOVE Test Emit >>>
+    // console.log(`Emitting connection_test to ${socket.id}`);
+    // socket.emit('connection_test', { id: socket.id, message: 'Backend says hello!' });
     // <<< END Test Emit >>>
     
     // Handle ping messages from clients (keep-alive)
@@ -258,7 +258,7 @@ function handleSocketConnection(socket) {
             const backendNamespace = io.of('/backend-temp'); // Get namespace instance
             // const userASocket = io.sockets.sockets.get(userA_SocketId); // Old lookup
             const userASocket = backendNamespace.sockets.get(userA_SocketId); // Lookup within namespace
-            console.log(`Lookup result for User A (${userA_SocketId}) in namespace ${backendNamespace.name}: ${userASocket ? 'Found' : 'Not Found'}`);
+            // console.log(`Lookup result for User A (${userA_SocketId}) in namespace ${backendNamespace.name}: ${userASocket ? 'Found' : 'Not Found'}`);
             
             if (!userASocket) {
                 // For HTTP-generated tokens without a connected User A,
@@ -276,7 +276,7 @@ function handleSocketConnection(socket) {
                     // Get User A's language from the token data stored earlier
                     const userA_Language = tokenData.hostLanguage || 'en'; // Use stored lang, default 'en'
                     const userB_Language = language; // Language sent by User B
-
+                    
                     const roomData = JSON.stringify({
                         token: token,
                         userB: { socketId: clientB_SocketId, language: userB_Language },
@@ -362,10 +362,10 @@ function handleSocketConnection(socket) {
             const payloadForA = { roomId: roomId, partnerLanguage: userB_Language };
             
             // Revert to emitting on socket variables
-            console.log(`Emitting joinedRoom to User B (${clientB_SocketId}) via socket variable. Payload:`, JSON.stringify(payloadForB));
+            // console.log(`Emitting joinedRoom to User B (${clientB_SocketId}) via socket variable. Payload:`, JSON.stringify(payloadForB));
             socket.emit('joinedRoom', payloadForB);
             
-            console.log(`Emitting joinedRoom to User A (${userA_SocketId}) via userASocket variable. Payload:`, JSON.stringify(payloadForA));
+            // console.log(`Emitting joinedRoom to User A (${userA_SocketId}) via userASocket variable. Payload:`, JSON.stringify(payloadForA));
             userASocket.emit('joinedRoom', payloadForA);
 
             console.log(`Successfully paired users in room ${roomId}`);
@@ -492,6 +492,32 @@ function handleSocketConnection(socket) {
         }
     });
 
+    // --- Typing Indicator Handlers ---
+    socket.on('startTyping', async () => {
+        console.log(`User ${socket.id} started typing...`);
+        const partnerSocketId = await findPartnerSocketId(socket.id);
+        if (partnerSocketId) {
+            const backendNamespace = io.of('/backend-temp');
+            const partnerSocket = backendNamespace.sockets.get(partnerSocketId);
+            if (partnerSocket) {
+                partnerSocket.emit('partnerTyping', { isTyping: true });
+            }
+        }
+    });
+
+    socket.on('stopTyping', async () => {
+        console.log(`User ${socket.id} stopped typing.`);
+        const partnerSocketId = await findPartnerSocketId(socket.id);
+        if (partnerSocketId) {
+            const backendNamespace = io.of('/backend-temp');
+            const partnerSocket = backendNamespace.sockets.get(partnerSocketId);
+            if (partnerSocket) {
+                partnerSocket.emit('partnerTyping', { isTyping: false });
+            }
+        }
+    });
+    // --- End Typing Indicators ---
+
     // TODO: Handle 'sendMessage' event
     socket.on('sendMessage', async ({ roomId, messageText }) => {
         console.log(`Message received in room ${roomId} from ${socket.id}: ${messageText}`);
@@ -589,14 +615,14 @@ function handleSocketConnection(socket) {
             const messagePayload = {
                 original: messageText,
                 translated: translationError || translatedText,
-                sender: '' // This will be set per recipient
+                sender: '', // This will be set per recipient
+                timestamp: Date.now() // Add timestamp
             };
 
             // Emit to recipient
-            // const recipientSocket = io.sockets.sockets.get(recipientSocketId); // Old global lookup
             const backendNamespace = io.of('/backend-temp'); // Get namespace instance
             const recipientSocket = backendNamespace.sockets.get(recipientSocketId); // Lookup within namespace
-            console.log(`Lookup result for Recipient (${recipientSocketId}) in namespace ${backendNamespace.name}: ${recipientSocket ? 'Found' : 'Not Found'}`);
+            // console.log(`Lookup result for Recipient (${recipientSocketId}) in namespace ${backendNamespace.name}: ${recipientSocket ? 'Found' : 'Not Found'}`);
 
             if (recipientSocket) {
                 messagePayload.sender = 'partner';
@@ -703,6 +729,24 @@ function handleSocketConnection(socket) {
     // TODO: Handle 'setLanguage' event (optional)
 }
 
+// Helper function to find partner socket ID
+async function findPartnerSocketId(socketId) {
+    const userRoomKey = `user_socket:${socketId}`;
+    const roomId = await redisClient.get(userRoomKey);
+    if (!roomId) return null;
+
+    const roomKey = `room:${roomId}`;
+    const roomDataString = await redisClient.get(roomKey);
+    if (!roomDataString) return null;
+
+    const roomData = JSON.parse(roomDataString);
+    if (roomData.userA && roomData.userA.socketId === socketId) {
+        return roomData.userB ? roomData.userB.socketId : null;
+    } else if (roomData.userB && roomData.userB.socketId === socketId) {
+        return roomData.userA ? roomData.userA.socketId : null;
+    }
+    return null;
+}
 
 // Add a health check endpoint
 app.get('/health', (req, res) => {

@@ -73,6 +73,11 @@ const MessageBubble = React.memo(({ message, myLanguage }: { message: any, myLan
         {showAlternate && showTranslationToggle && (
           <Text style={styles.messageAlternateText}>({alternateText})</Text>
         )}
+        {message.timestamp && (
+            <Text style={styles.timestampText}>
+                {new Date(message.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            </Text>
+        )}
       </View>
     </View>
   );
@@ -100,8 +105,9 @@ export default function JoinChatScreen() {
   const [inputText, setInputText] = useState('');
   const [partnerLeft, setPartnerLeft] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugMessage, setDebugMessage] = useState<string>('Initializing...');
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [partnerIsTyping, setPartnerIsTyping] = useState(false); // State for partner typing
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for typing timeout
   const flatListRef = useRef<FlatList>(null);
   const { socket, connect, disconnect, isConnected } = useSocket();
   const connectionAttempted = useRef(false);
@@ -109,9 +115,8 @@ export default function JoinChatScreen() {
 
   // Set initial state based on navigation type
   useEffect(() => {
-      if (token && !joined) {
+    if (token && !joined) {
           setUiStatus('selecting_language'); // Start by asking for language
-          setDebugMessage('Please select your language.');
       } else if (joined && passedRoomId) {
           // Host navigated here
           setMyLanguage(passedMyLanguage); // Host language passed via params
@@ -124,193 +129,127 @@ export default function JoinChatScreen() {
       }
   }, [token, joined, passedRoomId]); // Only run once on mount based on initial params
 
-  // --- Effect 1: Ensure Connection (for guests, now runs AFTER language selection) ---
+  // --- Effect 1: Ensure Connection (for guests) ---
   useEffect(() => {
     let isActive = true;
-    console.log(`[Effect 1 Check] uiStatus: ${uiStatus}, isConnected: ${isConnected}, connectionAttempted: ${connectionAttempted.current}`);
-    // Only attempt connection if status is 'connecting', not connected, and not already attempted.
     if (uiStatus === 'connecting' && !isConnected && !connectionAttempted.current) {
       connectionAttempted.current = true;
-      setDebugMessage('Attempting to connect socket...');
       setError(null);
-      console.log('[Effect 1] Calling connect()...');
-      
       connect()
         .then(() => {
            if (!isActive) return;
-           console.log('[Effect 1] connect() promise resolved.');
-           // isConnected state change will trigger Effect 2
-           setDebugMessage('Socket connection established.');
         })
         .catch((err) => {
             if (!isActive) return;
             console.error('[Effect 1] connect() promise rejected:', err);
-            setDebugMessage(`Socket connection failed: ${err.message}`);
             setError(`Could not connect: ${err.message}`);
             setUiStatus('error');
-            connectionAttempted.current = false; // Allow retry on next mount? Or handle retry differently
+            connectionAttempted.current = false; 
         });
     }
-    
     return () => { isActive = false; };
-  }, [uiStatus, isConnected, connect]); // Depends on uiStatus trigger now
-  
+  }, [uiStatus, isConnected, connect]);
+          
   // --- Effect 2: Emit Join & Setup Listeners (for guests) ---
   useEffect(() => {
     let hostCheckInterval: NodeJS.Timeout | null = null;
     let joinTimeout: NodeJS.Timeout | null = null;
     let isActive = true;
-    console.log(`[Effect 2 Check] uiStatus: ${uiStatus}, token: ${!!token}, joined: ${joined}, isConnected: ${isConnected}, socket: ${!!socket}, joinAttempted: ${joinAttempted.current}`);
-
-    // Only run if guest, connected, have token, and haven't tried joining yet
     if (uiStatus === 'connecting' && token && !joined && isConnected && socket && !joinAttempted.current) {
         joinAttempted.current = true; 
-        setDebugMessage(`Socket ready (ID: ${socket.id}). Emitting join with lang ${myLanguage}...`);
         setError(null);
-        console.log('[Effect 2] Conditions met. Emitting join and adding listeners.');
 
-        // Use the language selected by the user
-        // const userBLanguage = 'es'; // Old hardcoded value
         const userBLanguage = myLanguage;
         
-        // --- Setup Listeners FIRST --- 
-        const handleConnectionTest = (data: any) => {
-            console.log('[handleConnectionTest] Received:', data);
-            setDebugMessage(`Received connection_test from backend! ID: ${data.id}`);
-        };
-        console.log('[Effect 2] Adding listener: connection_test');
-        socket.on('connection_test', handleConnectionTest);
-
         const handleJoinedRoom = ({ roomId: receivedRoomId, partnerLanguage: receivedPartnerLang }: { roomId: string, partnerLanguage: string }) => {
-            // Log reception of the event
-            console.log(`[handleJoinedRoom] EVENT RECEIVED! Room: ${receivedRoomId}, Partner Lang: ${receivedPartnerLang}`);
-            if (!isActive) {
-                console.log('[handleJoinedRoom] Component inactive, ignoring event.');
-                return;
-            }
-            setDebugMessage(`Joined room ${receivedRoomId}!`);
+            if (!isActive) return;
             if (hostCheckInterval) clearInterval(hostCheckInterval);
-            if (joinTimeout) clearTimeout(joinTimeout); // Clear join timeout
-            setRoomId(receivedRoomId);
-            setPartnerLanguage(receivedPartnerLang);
+            if (joinTimeout) clearTimeout(joinTimeout);
+          setRoomId(receivedRoomId);
+          setPartnerLanguage(receivedPartnerLang);
             setUiStatus('joined');
-            setError(null);
+          setError(null);
         };
 
         const handleWaitingForHost = (data: any) => {
             try {
                 if (!isActive) return;
-                console.log('[handleWaitingForHost] Received data:', data);
-                setDebugMessage('Received waitingForHost event. Waiting...');
                 if (joinTimeout) clearTimeout(joinTimeout);
                 setUiStatus('waiting'); 
-                setError(null);
+          setError(null);
                 if (hostCheckInterval) clearInterval(hostCheckInterval); 
                 hostCheckInterval = setInterval(() => {
-                    console.log(`Join screen (Guest): Still waiting for host...`);
                 }, 15000); 
             } catch (e: any) {
                 console.error('[handleWaitingForHost] Error processing event:', e);
-                setDebugMessage(`Error in waitingForHost handler: ${e?.message || 'Unknown error'}`);
-                // Optionally set error state?
-            }
+              }
         };
 
         const handleError = (errorMessage: { message: string }) => {
             if (!isActive) return;
-            setDebugMessage(`Socket error during join/wait: ${errorMessage.message}`);
-            if (joinTimeout) clearTimeout(joinTimeout);
-            if (hostCheckInterval) clearInterval(hostCheckInterval);
-            setError(errorMessage.message || 'Could not join the chat room.');
+          setError(errorMessage.message || 'Could not join the chat room.');
             setUiStatus('error');
-            disconnect(); // Disconnect on error
-            joinAttempted.current = false; // Allow retry?
+            disconnect();
+            joinAttempted.current = false;
         };
         
-        console.log('[Effect 2] Adding listeners: joinedRoom, waitingForHost, error');
         socket.on('joinedRoom', handleJoinedRoom);
         socket.on('waitingForHost', handleWaitingForHost);
         socket.on('error', handleError);
-        // --- End Listeners Setup ---
 
-        // Emit the join event WITH LANGUAGE
-        console.log(`[Effect 2] Emitting join event with token ${token} and lang ${userBLanguage}`);
         socket.emit('join', { token: token, language: userBLanguage });
-        console.log(`[Effect 2] <<<<<< AFTER EMITTING join event with token ${token}`);
 
-        // Set a timeout specifically for the join/wait phase
         joinTimeout = setTimeout(() => {
             if (isActive && uiStatus !== 'joined') { 
-                setDebugMessage('Join/Wait process timed out after 90s.');
-                console.error("Join screen (Guest): Join/Wait timeout"); 
-                if (hostCheckInterval) clearInterval(hostCheckInterval);
                 setError(`Host did not respond or join failed within 90s timeout.`);
                 setUiStatus('error');
                 disconnect();
-                joinAttempted.current = false; // Allow retry?
+                joinAttempted.current = false;
             }
-          }, 90000); // Increased timeout to 90 seconds
+          }, 90000);
           
-        // Cleanup function for THIS effect
-        return () => {
+      return () => {
             isActive = false;
-            console.log('[Effect 2 Cleanup] Removing join listeners and clearing timeouts.');
             if (joinTimeout) clearTimeout(joinTimeout);
             if (hostCheckInterval) clearInterval(hostCheckInterval);
             if (socket) {
-                socket.off('connection_test', handleConnectionTest);
                 socket.off('joinedRoom', handleJoinedRoom);
                 socket.off('waitingForHost', handleWaitingForHost);
                 socket.off('error', handleError);
-            }
-            // Don't reset joinAttempted here unless you want auto-retry on dependency change
+         }
         };
     }
     
-    // Logic for host remains largely the same, ensure state is set if navigated here
     else if (joined && passedRoomId && isConnected && uiStatus !== 'joined') {
-        console.log(`[Effect 2 Host Check] Setting state for joined host. Room: ${passedRoomId}`);
         setRoomId(passedRoomId);
         setMyLanguage(passedMyLanguage); 
         setPartnerLanguage(passedPartnerLanguage);
         setUiStatus('joined'); 
-        setDebugMessage('Ready for chat (as host).');
     }
-    
-    // Dependencies: now includes myLanguage needed for the join emit
   }, [uiStatus, token, joined, isConnected, socket, disconnect, passedRoomId, passedMyLanguage, passedPartnerLanguage, myLanguage]); 
 
   // --- Effect 3: Chat Logic (runs once connection status is 'joined') ---
   useEffect(() => {
-    // Only run chat logic if joined successfully and socket is available
     if (uiStatus !== 'joined' || !roomId || !socket) {
-        // If we are supposed to be joined but socket is missing, it's an error
         if (uiStatus === 'joined' && !socket) {
             console.error("Chat logic: State is 'joined' but socket is missing!");
             setError("Connection lost unexpectedly.");
             setUiStatus('error');
         }
-        return; // Exit if not in the right state
+        return;
     }
-    
+
     let isActive = true; 
-    console.log(`Chat logic: Socket active (ID: ${socket.id}) in room ${roomId}. Setting up listeners.`);
-    // If we were reconnecting, clear the flag now that we are joined and ready
     if (isReconnecting) {
-        console.log("Chat logic: Reconnection successful.");
-        setDebugMessage("Reconnected successfully.");
         setIsReconnecting(false);
     }
 
-    // --- Define Event Handlers ---
     const handleNewMessage = (message: any) => {
         if (!isActive) return;
-        console.log('Chat message received:', message);
         setMessages((prevMessages) => [...prevMessages, { ...message, id: Date.now().toString() + Math.random() }]);
     };
     const handlePartnerLeft = () => {
         if (!isActive) return;
-        console.log('Partner left the chat');
         setPartnerLeft(true);
         Alert.alert("Partner Left", "Your chat partner has left the room.");
     };
@@ -318,73 +257,56 @@ export default function JoinChatScreen() {
         if (!isActive) return;
         console.error('Received error during chat:', errorMessage);
         Alert.alert('Chat Error', errorMessage.message || 'An unknown error occurred during chat.');
-        setError(errorMessage.message || 'Chat error');
-        setUiStatus('error');
-        // Consider disconnecting or navigating away
-        // disconnect(); 
-        // router.replace('/');
         setIsReconnecting(false);
+        setUiStatus('error');
     };
     const handleDisconnect = (reason: Socket.DisconnectReason) => {
         if (!isActive) return;
-        console.log('Disconnected during chat:', reason);
-        // Don't immediately go to error state if it was an unexpected disconnect
         if (reason !== 'io client disconnect' && uiStatus === 'joined') {
-             setDebugMessage(`Connection lost: ${reason}. Attempting to reconnect...`);
-             setError(null); // Clear previous errors
-             setIsReconnecting(true); // Set reconnecting status
-             // uiStatus remains 'joined' logically, UI will show reconnecting overlay
-             // Socket.IO client will automatically try to reconnect based on context settings
-             // We could add a listener for explicit reconnect_failed event if needed
+             setError(null); 
+             setIsReconnecting(true);
         }
     };
-    // <<< ADDED: Listener for reconnect success >>>
     const handleConnect = () => {
-        if (!isActive || !isReconnecting) return; // Only handle if we were explicitly reconnecting
-        console.log('Chat logic: Reconnect successful (handleConnect)');
-        setDebugMessage("Reconnected successfully.");
+        if (!isActive || !isReconnecting) return;
         setIsReconnecting(false);
         setError(null);
-        // No need to change uiStatus, should still be 'joined'
     };
-     // <<< ADDED: Listener for permanent reconnect failure >>>
     const handleReconnectFailed = () => {
         if (!isActive) return;
         console.error('Chat logic: Permanent reconnection failure.');
-        setDebugMessage("Failed to reconnect after multiple attempts.");
         setError("Connection lost. Please check your internet and refresh.");
         setIsReconnecting(false);
-        setUiStatus('error'); // Now set error state
+        setUiStatus('error');
     };
 
-    // --- Register Listeners ---
-    console.log("Chat logic: Attaching listeners (newMessage, partnerLeft, error, disconnect, connect, reconnect_failed)");
+    const handlePartnerTyping = ({ isTyping }: { isTyping: boolean }) => {
+        if (!isActive) return;
+        console.log(`Partner typing: ${isTyping}`);
+        setPartnerIsTyping(isTyping);
+    };
+
     socket.on('newMessage', handleNewMessage);
     socket.on('partnerLeft', handlePartnerLeft);
-    socket.on('error', handleError); 
-    socket.on('disconnect', handleDisconnect); 
-    socket.on('connect', handleConnect); // Listen for successful connect/reconnect
-    socket.io.on("reconnect_failed", handleReconnectFailed); // Listen for permanent failure
+    socket.on('partnerTyping', handlePartnerTyping);
+    socket.on('error', handleError);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect', handleConnect);
+    socket.io.on("reconnect_failed", handleReconnectFailed);
 
-    // --- Cleanup Chat Listeners ---
     return () => {
       isActive = false;
-      console.log('Chat logic: Cleaning up listeners for room', roomId);
-      // Remove listeners when component unmounts or state changes
       if (socket) {
         socket.off('newMessage', handleNewMessage);
         socket.off('partnerLeft', handlePartnerLeft);
+        socket.off('partnerTyping', handlePartnerTyping);
         socket.off('error', handleError);
         socket.off('disconnect', handleDisconnect);
         socket.off('connect', handleConnect);
         socket.io.off("reconnect_failed", handleReconnectFailed);
       }
-      // We disconnect globally when LEAVING the chat screen, not just on effect cleanup
-      // This is handled by the context provider cleanup now, or could be done via router events
-      // disconnect(); // Moved disconnect call out of here
     };
-    // Depend on socket instance and joined state
-  }, [uiStatus, roomId, socket, disconnect, isReconnecting]); // Added isReconnecting dependency
+  }, [uiStatus, roomId, socket, disconnect, isReconnecting]);
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -395,9 +317,7 @@ export default function JoinChatScreen() {
 
   // --- Send Message Handler ---
   const handleSend = useCallback(() => {
-    // Use socket from context
     if (inputText.trim() && !partnerLeft && socket?.connected && roomId) {
-      console.log(`Sending message to room ${roomId}: ${inputText}`);
       socket.emit('sendMessage', {
         roomId: roomId,
         messageText: inputText.trim(),
@@ -408,17 +328,49 @@ export default function JoinChatScreen() {
     } else if (!socket?.connected) {
         Alert.alert("Cannot Send", "You are not connected to the server.");
     }
-  }, [inputText, roomId, partnerLeft, socket]); // Add socket dependency
+  }, [inputText, roomId, partnerLeft, socket]);
 
   // Handler for confirming language selection
   const handleConfirmLanguage = () => {
-      console.log(`Language confirmed: ${myLanguage}. Proceeding to connect.`);
-      setDebugMessage('Language confirmed. Connecting...'); // Update debug
-      setUiStatus('connecting'); // Trigger connection effects
+      setUiStatus('connecting');
+  };
+
+  // --- Typing Event Emitters ---
+  const handleInputChange = (text: string) => {
+    setInputText(text);
+
+    if (socket?.connected && !typingTimeoutRef.current) {
+      // Send start typing immediately if not already typing
+      console.log('Emitting startTyping');
+      socket.emit('startTyping');
+    }
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set a timeout to send stop typing after 1.5 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      if (socket?.connected) {
+        console.log('Emitting stopTyping (timeout)');
+        socket.emit('stopTyping');
+      }
+      typingTimeoutRef.current = null; // Clear ref after sending
+    }, 1500); // 1.5 second timeout
+  };
+
+  const handleInputBlur = () => {
+    // Send stop typing immediately on blur if a timeout was pending
+    if (typingTimeoutRef.current && socket?.connected) {
+        clearTimeout(typingTimeoutRef.current);
+        console.log('Emitting stopTyping (blur)');
+        socket.emit('stopTyping');
+        typingTimeoutRef.current = null;
+    }
   };
 
   // --- Render Logic ---
-  // NEW: Language Selection state
   if (uiStatus === 'selecting_language') {
       return (
           <View style={styles.centerStatus}>
@@ -438,26 +390,18 @@ export default function JoinChatScreen() {
               >
                   Confirm & Join Chat
               </PaperButton>
-              <Text style={styles.debugText}>Debug: {debugMessage}</Text>
           </View>
       );
   }
 
-  // Loading / Connecting / Waiting states
-  if (uiStatus === 'connecting' || uiStatus === 'waiting') { // Removed idle state from here
-    let statusMessage = 'Initializing...'; // Default for idle
-    if (uiStatus === 'connecting') statusMessage = 'Connecting...';
+  if (uiStatus === 'connecting' || uiStatus === 'waiting') {
+    let statusMessage = 'Connecting...';
     if (uiStatus === 'waiting') statusMessage = 'Waiting for host...';
     
     return (
         <View style={styles.centerStatus}>
             <ActivityIndicator size="large" />
             <Text style={styles.statusText}>{statusMessage}</Text>
-            {/* Display Debug Info */}
-            <Text style={styles.debugText}>Status: {uiStatus}</Text>
-            <Text style={styles.debugText}>Socket Connected: {isConnected ? 'Yes' : 'No'}</Text>
-            {socket?.id && <Text style={styles.debugText}>Socket ID: {socket.id}</Text>}
-            <Text style={styles.debugText}>Debug: {debugMessage}</Text> 
             {uiStatus === 'waiting' && (
                 <Text style={styles.waitingText}>
                     Please keep this screen open.
@@ -467,7 +411,6 @@ export default function JoinChatScreen() {
     );
   }
 
-  // Error state
   if (uiStatus === 'error') {
      return (
         <View style={styles.centerStatus}>
@@ -478,7 +421,6 @@ export default function JoinChatScreen() {
     );
   }
 
-  // Fallback for unexpected state (should not happen)
   if (uiStatus !== 'joined' || !roomId) {
        return (
         <View style={styles.centerStatus}>
@@ -488,17 +430,14 @@ export default function JoinChatScreen() {
     );
   }
 
-  // --- Render Chat UI ---
   return (
     <SafeAreaView style={styles.safeArea}>
-        {/* Set screen title dynamically */}
         <Stack.Screen options={{ title: `Room: ${roomId.split('_')[1]}` }} />
         <KeyboardAvoidingView
             style={styles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Adjust as needed
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
-            {/* ADD Reconnecting Indicator Overlay */}
             {isReconnecting && (
                 <View style={styles.reconnectingOverlay}>
                     <ActivityIndicator size="small" color="#FFF" />
@@ -518,18 +457,24 @@ export default function JoinChatScreen() {
                 style={styles.messageList}
                 contentContainerStyle={{ paddingVertical: 10 }}
             />
+            {partnerIsTyping && (
+                <View style={styles.typingIndicatorContainer}>
+                    <Text style={styles.typingIndicatorText}>Partner is typing...</Text>
+                </View>
+            )}
             <View style={styles.inputContainer}>
                 <TextInput
                     style={styles.input}
                     value={inputText}
-                    onChangeText={setInputText}
+                    onChangeText={handleInputChange}
+                    onBlur={handleInputBlur}
                     placeholder="Type your message..."
-                    editable={!partnerLeft && isConnected && !isReconnecting} // Disable input if partner left OR not connected/reconnecting
+                    editable={!partnerLeft && isConnected && !isReconnecting}
                 />
                 <PaperButton 
                   mode="contained" 
                   onPress={handleSend} 
-                  disabled={partnerLeft || !inputText.trim() || !isConnected || isReconnecting} // Disable send if partner left OR not connected/reconnecting
+                  disabled={partnerLeft || !inputText.trim() || !isConnected || isReconnecting}
                   style={styles.sendButton}
                 >
                     Send
@@ -540,14 +485,13 @@ export default function JoinChatScreen() {
   );
 }
 
-// --- Styles --- (Combined and adjusted)
 const styles = StyleSheet.create({
   centerStatus: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
       padding: 20,
-      backgroundColor: '#f5f5f5' // Match other screens
+      backgroundColor: '#f5f5f5'
   },
   statusText: {
       marginTop: 15,
@@ -588,7 +532,7 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center', // Align items vertically
+    alignItems: 'center',
     padding: 10,
     borderTopWidth: 1,
     borderTopColor: '#ccc',
@@ -600,13 +544,12 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 20,
     paddingHorizontal: 15,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8, // Adjust padding per platform
+    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
     marginRight: 10,
     backgroundColor: '#fff',
-    fontSize: 16, // Make font size consistent
+    fontSize: 16,
   },
   sendButton: {
-      // Add some style if needed, e.g., marginLeft: 5
   },
   messageRow: {
       flexDirection: 'row',
@@ -639,25 +582,31 @@ const styles = StyleSheet.create({
       marginRight: 'auto',
       borderBottomLeftRadius: 0,
   },
-  messageContentRow: { // New style for text + icon
+  messageContentRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  messagePrimaryText: { // Renamed from messageOriginal
+  messagePrimaryText: {
       fontSize: 16,
-      flexShrink: 1, // Allow text to shrink if icon takes space
-      marginRight: 4, // Space between text and icon
+      flexShrink: 1,
+      marginRight: 4,
   },
-  messageAlternateText: { // Renamed from messageTranslated
+  messageAlternateText: {
       fontSize: 14,
       color: '#555',
       fontStyle: 'italic',
       marginTop: 3,
   },
+  timestampText: {
+      fontSize: 10,
+      color: '#999',
+      marginTop: 4,
+      textAlign: 'right',
+  },
   translateIcon: {
-      margin: -4, // Reduce default margins/padding of IconButton
-      height: 20, // Adjust height if needed
-      width: 20,  // Adjust width if needed
+      margin: -4,
+      height: 20,
+      width: 20,
   },
   partnerLeftBanner: {
       padding: 10,
@@ -667,13 +616,6 @@ const styles = StyleSheet.create({
   partnerLeftText: {
       color: '#d32f2f',
       fontWeight: 'bold',
-  },
-  debugText: {
-      fontSize: 12,
-      color: '#888',
-      marginTop: 5,
-      textAlign: 'center',
-      marginHorizontal: 15,
   },
   reconnectingOverlay: {
     position: 'absolute',
@@ -685,7 +627,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10, // Ensure it's above other elements
+    zIndex: 10,
   },
   reconnectingText: {
       color: '#FFF',
@@ -695,8 +637,17 @@ const styles = StyleSheet.create({
   radioButtonRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 8, // Add some spacing
-      width: '60%', // Adjust width as needed
-      justifyContent: 'flex-start', // Align items
+      marginBottom: 8,
+      width: '60%',
+      justifyContent: 'flex-start',
+  },
+  typingIndicatorContainer: {
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+  },
+  typingIndicatorText: {
+    fontSize: 12,
+    color: '#888',
+    fontStyle: 'italic',
   }
 }); 

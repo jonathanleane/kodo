@@ -10,7 +10,7 @@ import { DefaultEventsMap } from '@socket.io/component-emitter';
 const BACKEND_URL = 'https://kodo-backend-s7vj.onrender.com'; // NEW Render Backend URL
 const SOCKET_NAMESPACE = '/backend-temp'; // Use the correct namespace
 
-console.log('SocketContext Using BACKEND_URL:', BACKEND_URL);
+// console.log('SocketContext Using BACKEND_URL:', BACKEND_URL);
 
 // Type for the socket instance
 export type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
