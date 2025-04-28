@@ -10,12 +10,13 @@ import {
   Platform,
   SafeAreaView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  ScrollView
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import io, { Socket } from 'socket.io-client';
 import { DefaultEventsMap } from '@socket.io/component-emitter';
-import { Button as PaperButton, Text as PaperText, IconButton } from 'react-native-paper';
+import { Button as PaperButton, Text as PaperText, IconButton, useTheme } from 'react-native-paper';
 import { useSocket, AppSocket } from '../context/SocketContext'; // Import the hook and type
 import * as Localization from 'expo-localization'; // Import localization
 import { formatDistanceToNow } from 'date-fns'; // Import date-fns function
@@ -97,6 +98,7 @@ export default function JoinChatScreen() {
   const passedRoomId = params.roomId as string;
   const passedMyLanguage = params.myLanguage as string; // This is HOST lang when navigated
   const passedPartnerLanguage = params.partnerLanguage as string;
+  const theme = useTheme(); // Get theme
 
   // State Management
   const [uiStatus, setUiStatus] = useState('idle'); // idle, selecting_language, connecting, waiting, joined, error
@@ -154,7 +156,7 @@ export default function JoinChatScreen() {
         .catch((err) => {
             if (!isActive) return;
             console.error('[Effect 1] connect() promise rejected:', err);
-            setError(`Could not connect: ${err.message}`);
+            setError(`Socket connection failed: ${err.message}`);
             setUiStatus('error');
             connectionAttempted.current = false; // Allow retry on next mount? Or handle retry differently
         });
@@ -188,12 +190,10 @@ export default function JoinChatScreen() {
         socket.on('connection_test', handleConnectionTest);
 
         const handleJoinedRoom = ({ roomId: receivedRoomId, partnerLanguage: receivedPartnerLang }: { roomId: string, partnerLanguage: string }) => {
-            // Log reception of the event
+            if (!isActive) return;
             console.log(`[handleJoinedRoom] EVENT RECEIVED! Room: ${receivedRoomId}, Partner Lang: ${receivedPartnerLang}`);
-            if (!isActive) {
-                console.log('[handleJoinedRoom] Component inactive, ignoring event.');
-                return;
-            }
+            if (hostCheckInterval) clearInterval(hostCheckInterval);
+            if (joinTimeout) clearTimeout(joinTimeout);
             setRoomId(receivedRoomId);
             setPartnerLanguage(receivedPartnerLang);
             setUiStatus('joined');
@@ -204,6 +204,7 @@ export default function JoinChatScreen() {
             try {
                 if (!isActive) return;
                 console.log('[handleWaitingForHost] Received data:', data);
+                if (joinTimeout) clearTimeout(joinTimeout);
                 setUiStatus('waiting'); 
                 setError(null);
                 if (hostCheckInterval) clearInterval(hostCheckInterval); 
@@ -212,17 +213,19 @@ export default function JoinChatScreen() {
                 }, 15000); 
             } catch (e: any) {
                 console.error('[handleWaitingForHost] Error processing event:', e);
-                setError(e?.message || 'Unknown error');
-                // Optionally set error state?
+                setError(`Error in waitingForHost handler: ${e?.message || 'Unknown error'}`);
             }
         };
 
         const handleError = (errorMessage: { message: string }) => {
             if (!isActive) return;
+            console.error(`[handleError] Received socket error: ${errorMessage.message}`);
+            if (joinTimeout) clearTimeout(joinTimeout);
+            if (hostCheckInterval) clearInterval(hostCheckInterval);
             setError(errorMessage.message || 'Could not join the chat room.');
             setUiStatus('error');
-            disconnect(); // Disconnect on error
-            joinAttempted.current = false; // Allow retry?
+            disconnect(); 
+            joinAttempted.current = false; 
         };
         
         console.log('[Effect 2] Adding listeners: joinedRoom, waitingForHost, error');
@@ -471,12 +474,13 @@ export default function JoinChatScreen() {
   // NEW: Language Selection state
   if (uiStatus === 'selecting_language') {
       return (
-          <View style={styles.centerStatus}>
-              <PaperText variant="titleMedium" style={{marginBottom: 15}}>Select Your Language:</PaperText>
+          <View style={[styles.centerStatus, {backgroundColor: theme.colors.background}]}>
+              <PaperText variant="titleMedium" style={{marginBottom: 15, color: theme.colors.onBackground}}>Select Your Language:</PaperText>
               <View style={styles.pickerWrapper}> 
                 <Picker
                   selectedValue={myLanguage}
-                  style={styles.picker}
+                  style={[styles.picker, {backgroundColor: theme.colors.surface, color: theme.colors.onSurface}]} // Apply theme
+                  dropdownIconColor={theme.colors.onSurfaceVariant}
                   onValueChange={(newValue: string) => setMyLanguage(newValue)}
                 >
                   {SUPPORTED_LANGUAGES.map(lang => (
@@ -502,17 +506,17 @@ export default function JoinChatScreen() {
     if (uiStatus === 'waiting') statusMessage = 'Waiting for host...';
     
     return (
-        <View style={styles.centerStatus}>
-            <ActivityIndicator size="large" />
-            <Text style={styles.statusText}>{statusMessage}</Text>
+        <View style={[styles.centerStatus, {backgroundColor: theme.colors.background}]}>
+            <ActivityIndicator size="large" color={theme.colors.primary}/>
+            <PaperText style={[styles.statusText, {color: theme.colors.onBackground}]}>{statusMessage}</PaperText>
             {/* Display Debug Info */}
-            <Text style={styles.debugText}>Status: {uiStatus}</Text>
-            <Text style={styles.debugText}>Socket Connected: {isConnected ? 'Yes' : 'No'}</Text>
-            {socket?.id && <Text style={styles.debugText}>Socket ID: {socket.id}</Text>}
+            <PaperText style={styles.debugText}>Status: {uiStatus}</PaperText>
+            <PaperText style={styles.debugText}>Socket Connected: {isConnected ? 'Yes' : 'No'}</PaperText>
+            {socket?.id && <PaperText style={styles.debugText}>Socket ID: {socket.id}</PaperText>}
             {uiStatus === 'waiting' && (
-                <Text style={styles.waitingText}>
+                <PaperText style={styles.waitingText}>
                     Please keep this screen open.
-                </Text>
+                </PaperText>
             )}
         </View>
     );
@@ -521,9 +525,9 @@ export default function JoinChatScreen() {
   // Error state
   if (uiStatus === 'error') {
      return (
-        <View style={styles.centerStatus}>
-            <Text style={styles.errorText}>Error</Text>
-            <Text style={styles.errorDetail}>{error || "An unknown error occurred."}</Text>
+        <View style={[styles.centerStatus, {backgroundColor: theme.colors.background}]}>
+            <PaperText variant="titleMedium" style={[styles.errorText, {color: theme.colors.error}]}>Error</PaperText>
+            <PaperText style={[styles.errorDetail, {color: theme.colors.onSurfaceVariant}]}>{error || "An unknown error occurred."}</PaperText>
              <PaperButton mode="contained" onPress={() => {disconnect(); router.replace('/');}}>Go Home</PaperButton>
         </View>
     );
@@ -532,8 +536,8 @@ export default function JoinChatScreen() {
   // Fallback for unexpected state (should not happen)
   if (uiStatus !== 'joined' || !roomId) {
        return (
-        <View style={styles.centerStatus}>
-            <Text style={styles.errorText}>Something went wrong</Text>
+        <View style={[styles.centerStatus, {backgroundColor: theme.colors.background}]}>
+            <PaperText style={styles.errorText}>Something went wrong</PaperText>
              <PaperButton mode="contained" onPress={() => {disconnect(); router.replace('/');}}>Go Home</PaperButton>
         </View>
     );
@@ -541,7 +545,7 @@ export default function JoinChatScreen() {
 
   // --- Render Chat UI ---
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, {backgroundColor: theme.colors.background}]}>
         {/* Set screen title dynamically */}
         <Stack.Screen options={{ title: `Room: ${roomId.split('_')[1]}` }} />
         <KeyboardAvoidingView
@@ -553,12 +557,12 @@ export default function JoinChatScreen() {
             {isReconnecting && (
                 <View style={styles.reconnectingOverlay}>
                     <ActivityIndicator size="small" color="#FFF" />
-                    <Text style={styles.reconnectingText}>Connection lost. Reconnecting...</Text>
+                    <PaperText style={styles.reconnectingText}>Connection lost. Reconnecting...</PaperText>
                 </View>
             )}
             {partnerLeft && (
                 <View style={styles.partnerLeftBanner}>
-                    <Text style={styles.partnerLeftText}>Your partner has left the chat.</Text>
+                    <PaperText style={styles.partnerLeftText}>Your partner has left the chat.</PaperText>
                 </View>
             )}
             <FlatList
@@ -567,14 +571,19 @@ export default function JoinChatScreen() {
                 renderItem={({ item }) => <MessageBubble message={item} myLanguage={myLanguage} />}
                 keyExtractor={(item) => item.id}
                 style={styles.messageList}
-                contentContainerStyle={{ paddingVertical: 10 }}
+                contentContainerStyle={{ paddingBottom: 10 }} // Add padding to bottom
+                ListEmptyComponent={() => (
+                    <View style={styles.emptyChatContainer}>
+                        <PaperText style={styles.emptyChatText}>No messages yet. Start chatting!</PaperText>
+                    </View>
+                )}
                 ListFooterComponent={isPartnerTyping ? (
                     <PaperText style={styles.typingIndicator}>Partner is typing...</PaperText>
                 ) : null}
             />
-            <View style={styles.inputContainer}>
+            <View style={[styles.inputContainer, {backgroundColor: theme.colors.elevation.level2}]}> // Themed background
                 <TextInput
-                    style={styles.input}
+                    style={[styles.input, {backgroundColor: theme.colors.background, color: theme.colors.onSurface, borderColor: theme.colors.outline}] }
                     value={inputText}
                     onChangeText={handleInputChange}
                     onBlur={handleInputBlur}
@@ -602,13 +611,14 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       alignItems: 'center',
       padding: 20,
-      backgroundColor: '#f5f5f5' // Match other screens
+      // Background set inline
   },
   statusText: {
       marginTop: 15,
       fontSize: 16,
       marginBottom: 10,
       textAlign: 'center'
+      // Color set inline
   },
   waitingText: {
       fontSize: 14,
@@ -619,20 +629,20 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
-    color: 'red',
+    // color: 'red', // Use theme color
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center'
   },
   errorDetail: {
     fontSize: 14,
-    color: 'grey',
+    // color: 'grey', // Use theme color
     marginBottom: 20,
     textAlign: 'center'
   },
   safeArea: {
       flex: 1,
-      backgroundColor: '#f0f0f0'
+      // backgroundColor: '#f0f0f0' // Use theme color
   },
   container: {
     flex: 1,
@@ -643,25 +653,25 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center', // Align items vertically
+    alignItems: 'center', 
     padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#ccc',
-    backgroundColor: '#fff',
+    borderTopWidth: StyleSheet.hairlineWidth, // Thinner border
+    borderTopColor: '#ccc', // Use theme.colors.outline?
+    // Background set inline
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ccc',
+    // borderColor: '#ccc', // Use theme color
     borderRadius: 20,
     paddingHorizontal: 15,
-    paddingVertical: Platform.OS === 'ios' ? 10 : 8, // Adjust padding per platform
+    paddingVertical: Platform.OS === 'ios' ? 10 : 8, 
     marginRight: 10,
-    backgroundColor: '#fff',
-    fontSize: 16, // Make font size consistent
+    fontSize: 16, 
+    // Color/Background set inline
   },
   sendButton: {
-      // Add some style if needed, e.g., marginLeft: 5
+      // ...
   },
   messageRow: {
       flexDirection: 'row',
@@ -685,12 +695,14 @@ const styles = StyleSheet.create({
       shadowRadius: 1,
   },
   messageBubbleSelf: {
-      backgroundColor: '#dcf8c6',
+      backgroundColor: '#DCF8C6', // Keep chat bubble colors distinct for now
+      // Could use theme.colors.primaryContainer / onPrimaryContainer if desired
       marginLeft: 'auto',
       borderBottomRightRadius: 0,
   },
   messageBubblePartner: {
-      backgroundColor: '#fff',
+      backgroundColor: '#FFFFFF', // Keep chat bubble colors distinct for now
+      // Could use theme.colors.secondaryContainer / onSecondaryContainer if desired
       marginRight: 'auto',
       borderBottomLeftRadius: 0,
   },
@@ -759,16 +771,16 @@ const styles = StyleSheet.create({
       marginLeft: 10,
       fontWeight: 'bold',
   },
-  pickerWrapper: { // Style for Picker wrapper (copied from generate.tsx)
+  pickerWrapper: { 
     width: '80%',
+    maxWidth: 350, // Max width for picker
     marginTop: 10,
     marginBottom: 10,
-    borderColor: '#ccc',
     borderWidth: 1,
     borderRadius: 4,
-    backgroundColor: 'white',
+    // Colors set inline
   },
-  picker: { // Style for Picker itself (copied from generate.tsx)
+  picker: { 
       height: 50,
       width: '100%',
   },
@@ -778,5 +790,17 @@ const styles = StyleSheet.create({
       fontStyle: 'italic',
       color: '#888',
       textAlign: 'center', // Or align left/right as desired
-  }
+  },
+  emptyChatContainer: { // Style for empty chat message
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+      marginTop: 50, 
+  },
+  emptyChatText: {
+      fontSize: 16,
+      color: 'grey',
+      textAlign: 'center',
+  },
 }); 

@@ -1,28 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
-    Text,
-    StyleSheet,
+    ScrollView,
     ActivityIndicator,
-    Alert,
-    Platform,
-    ScrollView
+    StyleSheet
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-// import io, { Socket } from 'socket.io-client'; // No longer need direct import
 import { router, useNavigation, Href } from 'expo-router';
-import { useSocket } from '../context/SocketContext'; // Import the hook
-// import * as Network from 'expo-network'; // To get IP address
-// import { DefaultEventsMap } from '@socket.io/component-emitter'; // Type comes from context
-import * as Localization from 'expo-localization'; // Import localization
-import { Button as PaperButton, Text as PaperText } from 'react-native-paper'; // Remove RadioButton
-import { Picker } from '@react-native-picker/picker'; // Use Picker
-import * as Clipboard from 'expo-clipboard'; // Import clipboard
-
-// Use environment variables provided by the build environment
-// Fallback to hardcoded values only if environment variables are not set (useful for local dev without .env)
-// const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://kodo-backend-production.up.railway.app'; 
-// const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'https://kodo-frontend-production.up.railway.app';
+import { useSocket } from '../context/SocketContext';
+import * as Localization from 'expo-localization';
+import { Button as PaperButton, Text as PaperText, useTheme } from 'react-native-paper';
+import { Picker } from '@react-native-picker/picker';
+import * as Clipboard from 'expo-clipboard';
 
 // Supported Languages (Example)
 const SUPPORTED_LANGUAGES = [
@@ -49,9 +38,6 @@ const FRONTEND_URL = 'https://kodo-frontend.onrender.com'; // Use the actual Ren
 console.log('Using BACKEND_URL:', BACKEND_URL);
 console.log('Using FRONTEND_URL:', FRONTEND_URL);
 
-// Define the path for Socket.IO (standard path)
-// const socketIoPath = "/socket.io"; // Managed by context
-
 export default function GenerateQRScreen() {
   const [qrToken, setQrToken] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
@@ -63,6 +49,7 @@ export default function GenerateQRScreen() {
   const [languageConfirmed, setLanguageConfirmed] = useState(false); // Track confirmation
   const [linkCopied, setLinkCopied] = useState(false); // State for copy feedback
   const { socket, connect, disconnect, isConnected } = useSocket();
+  const theme = useTheme();
   const hasInitiatedProcess = useRef(false); // Track if fetch/connect started
 
   const webAppBaseUrl = FRONTEND_URL;
@@ -189,21 +176,21 @@ export default function GenerateQRScreen() {
   };
 
   // --- Render Logic --- 
-  // Log state variables just before rendering
   console.log(`[Render] Status: "${status}", QR URL Ready: ${!!qrUrl}, Error: ${error}`);
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <PaperText variant="headlineSmall" style={styles.status}>{status}</PaperText>
+    <ScrollView contentContainerStyle={[styles.scrollContainer, {backgroundColor: theme.colors.background}]}>
+      <PaperText variant="headlineSmall" style={[styles.status, {color: theme.colors.onBackground}]}>{status}</PaperText>
       
       {/* Language Picker - Show only before confirmation */}
       {!languageConfirmed && status === 'selecting_language' ? (
-          <View style={styles.languageSelectContainer}>
-              <PaperText variant="titleMedium">Select Your Language:</PaperText>
-              <View style={styles.pickerWrapper}> 
+          <View style={[styles.languageSelectContainer, {backgroundColor: theme.colors.surface}]}>
+              <PaperText variant="titleMedium" style={{marginBottom: 10, color: theme.colors.onSurfaceVariant}}>Select Your Language:</PaperText>
+              <View style={[styles.pickerWrapper, {borderColor: theme.colors.outline}]}> 
                 <Picker
                     selectedValue={myLanguage}
-                    style={styles.picker}
+                    style={[styles.picker, {backgroundColor: theme.colors.surface, color: theme.colors.onSurface}] }
+                    dropdownIconColor={theme.colors.onSurfaceVariant} // Style dropdown arrow
                     onValueChange={(itemValue: string) => setMyLanguage(itemValue)}
                 >
                     {SUPPORTED_LANGUAGES.map(lang => (
@@ -215,29 +202,26 @@ export default function GenerateQRScreen() {
                   mode="contained" 
                   onPress={handleConfirmLanguage} 
                   style={{marginTop: 20}}
+                  // Use theme primary color implicitly
               >
                   Confirm & Generate QR
               </PaperButton>
           </View>
       ) : null}
 
-      {error && <PaperText style={styles.errorText}>{error}</PaperText>}
+      {error && <PaperText style={[styles.errorText, {color: theme.colors.error}]}>{error}</PaperText>}
       
       {/* QR Code - Show only when listening */}
       {qrUrl && status === 'Listening for partner... (Scan QR Code)' && !error ? (
         <View style={styles.qrContainer}> 
-          <QRCode
-            value={qrUrl}
-            size={250}
-            color="black"
-            backgroundColor="white"
-          />
-          <PaperText style={styles.info}>Ask your chat partner to scan this code using their phone's camera.</PaperText>
+          <QRCode value={qrUrl} size={250} color={theme.colors.onBackground} backgroundColor={theme.colors.background} />
+          <PaperText style={[styles.info, {color: theme.colors.secondary}]}>Ask your partner to scan this code, OR</PaperText>
           <PaperButton 
-              mode="outlined" // Use outlined or text style for secondary action
+              mode="text" // Change to text button for secondary action
               icon="content-copy"
               onPress={copyToClipboard}
               style={styles.copyButton}
+              // Use theme primary color implicitly for text button
           >
               {linkCopied ? 'Link Copied!' : 'Copy Invite Link'}
           </PaperButton>
@@ -246,7 +230,7 @@ export default function GenerateQRScreen() {
       
       {/* Spinner - Show during intermediate states after language confirmation */}
       {(status === 'Requesting QR Code...' || status === 'Connecting to chat service...') && !error ? (
-        <ActivityIndicator size="large" style={{marginTop: 30}} />
+        <ActivityIndicator size="large" style={{marginTop: 30}} color={theme.colors.primary} />
       ) : null}
 
     </ScrollView>
@@ -260,15 +244,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
     paddingTop: 40,
-    backgroundColor: '#f5f5f5'
   },
   status: {
     marginBottom: 30,
     textAlign: 'center'
   },
    errorText: {
-        color: 'red',
-        marginTop: 20,
+        marginTop: 20, 
         marginBottom: 20,
         textAlign: 'center',
         fontWeight: 'bold'
@@ -279,34 +261,27 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       marginBottom: 20,
       padding: 20,
-      backgroundColor: 'white',
       borderRadius: 8,
       elevation: 2,
   },
-  pickerWrapper: { // Style for Picker wrapper (for background/border)
+  pickerWrapper: { 
     width: '80%',
     marginTop: 10,
     marginBottom: 10,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 4,
-    backgroundColor: 'white',
   },
-  picker: { // Style for Picker itself
+  picker: { 
       height: 50,
       width: '100%',
-      // backgroundColor: '#FFF', // Background on wrapper instead
   },
   qrContainer: { 
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 20, 
     marginBottom: 20, 
   },
   info: {
       marginTop: 30,
       textAlign: 'center',
       fontSize: 16,
-      color: 'grey',
       paddingHorizontal: 10,
   },
   copyButton: {
