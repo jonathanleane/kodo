@@ -1,0 +1,12 @@
+{
+  "send": "发送",
+  "confirmAndJoin": "确认并加入",
+  "confirmAndGenerate": "确认并生成二维码",
+  "partnerIsTyping": "对方正在输入...",
+  "selectYourLanguage": "选择您的语言：",
+  "noMessagesYet": "暂无消息。开始聊天吧！",
+  "typeYourMessage": "输入您的消息...",
+  "connectionLostReconnecting": "连接已断开。正在重新连接...",
+  "copyInviteLink": "复制邀请链接",
+  "linkCopied": "链接已复制！"
+} 

@@ -12,6 +12,7 @@ import * as Localization from 'expo-localization';
 import { Button as PaperButton, Text as PaperText, useTheme } from 'react-native-paper';
 import { Picker } from '@react-native-picker/picker';
 import * as Clipboard from 'expo-clipboard';
+import i18n, { setLocale } from '../translations/i18n.config';
 
 // Supported Languages (Example)
 const SUPPORTED_LANGUAGES = [
@@ -47,8 +48,9 @@ export default function GenerateQRScreen() {
   const [status, setStatus] = useState<string>('selecting_language'); // Start with language selection
   const [error, setError] = useState<string | null>(null);
   // Language State 
-  const defaultLanguage = Localization.getLocales()[0]?.languageCode || 'en';
-  const [myLanguage, setMyLanguage] = useState<string>(SUPPORTED_LANGUAGES.find(l => l.value === defaultLanguage) ? defaultLanguage : 'en');
+  // const defaultLanguage = Localization.getLocales()[0]?.languageCode || 'en';
+  // const [myLanguage, setMyLanguage] = useState<string>(SUPPORTED_LANGUAGES.find(l => l.value === defaultLanguage) ? defaultLanguage : 'en');
+  const [myLanguage, setMyLanguage] = useState<string>(i18n.locale.substring(0, 2)); // Get initial locale from i18n
   const [languageConfirmed, setLanguageConfirmed] = useState(false); // Track confirmation
   const [linkCopied, setLinkCopied] = useState(false); // State for copy feedback
   const { socket, connect, disconnect, isConnected } = useSocket();
@@ -168,6 +170,13 @@ export default function GenerateQRScreen() {
       setLanguageConfirmed(true);
   };
 
+  // Update language in i18n when selected
+  const handleLanguageChange = (itemValue: string) => {
+      setMyLanguage(itemValue);
+      setLocale(itemValue); // Update i18n locale
+      console.log('i18n locale set to:', itemValue);
+  };
+
   // --- Copy Link Handler ---
   const copyToClipboard = async () => {
     if (qrUrl) {
@@ -188,13 +197,13 @@ export default function GenerateQRScreen() {
       {/* Language Picker - Show only before confirmation */}
       {!languageConfirmed && status === 'selecting_language' ? (
           <View style={[styles.languageSelectContainer, {backgroundColor: theme.colors.surface}]}>
-              <PaperText variant="titleMedium" style={{marginBottom: 10, color: theme.colors.onSurfaceVariant}}>Select Your Language:</PaperText>
+              <PaperText variant="titleMedium" style={{marginBottom: 10, color: theme.colors.onSurfaceVariant}}>{i18n.t('selectYourLanguage')}</PaperText>
               <View style={[styles.pickerWrapper, {borderColor: theme.colors.outline}]}> 
                 <Picker
                     selectedValue={myLanguage}
                     style={[styles.picker, {backgroundColor: theme.colors.surface, color: theme.colors.onSurface}] }
-                    dropdownIconColor={theme.colors.onSurfaceVariant} // Style dropdown arrow
-                    onValueChange={(itemValue: string) => setMyLanguage(itemValue)}
+                    dropdownIconColor={theme.colors.onSurfaceVariant}
+                    onValueChange={handleLanguageChange}
                 >
                     {SUPPORTED_LANGUAGES.map(lang => (
                         <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
@@ -205,9 +214,8 @@ export default function GenerateQRScreen() {
                   mode="contained" 
                   onPress={handleConfirmLanguage} 
                   style={{marginTop: 20}}
-                  // Use theme primary color implicitly
               >
-                  Confirm & Generate QR
+                  {i18n.t('confirmAndGenerate')}
               </PaperButton>
           </View>
       ) : null}
@@ -220,13 +228,12 @@ export default function GenerateQRScreen() {
           <QRCode value={qrUrl} size={250} color={theme.colors.onBackground} backgroundColor={theme.colors.background} />
           <PaperText style={[styles.info, {color: theme.colors.secondary}]}>Ask your partner to scan this code, OR</PaperText>
           <PaperButton 
-              mode="text" // Change to text button for secondary action
+              mode="text"
               icon="content-copy"
               onPress={copyToClipboard}
               style={styles.copyButton}
-              // Use theme primary color implicitly for text button
           >
-              {linkCopied ? 'Link Copied!' : 'Copy Invite Link'}
+              {linkCopied ? i18n.t('linkCopied') : i18n.t('copyInviteLink')}
           </PaperButton>
         </View>
       ) : null} 

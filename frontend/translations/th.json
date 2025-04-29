@@ -1,0 +1,12 @@
+{
+  "send": "Send",
+  "confirmAndJoin": "Confirm & Join Chat",
+  "confirmAndGenerate": "Confirm & Generate QR",
+  "partnerIsTyping": "Partner is typing...",
+  "selectYourLanguage": "Select Your Language:",
+  "noMessagesYet": "No messages yet. Start chatting!",
+  "typeYourMessage": "Type your message...",
+  "connectionLostReconnecting": "Connection lost. Reconnecting...",
+  "copyInviteLink": "Copy Invite Link",
+  "linkCopied": "Link Copied!"
+} 

@@ -1,0 +1,12 @@
+{
+  "send": "Envoyer",
+  "confirmAndJoin": "Confirmer et Rejoindre",
+  "confirmAndGenerate": "Confirmer et Générer QR",
+  "partnerIsTyping": "Le partenaire écrit...",
+  "selectYourLanguage": "Sélectionnez Votre Langue :",
+  "noMessagesYet": "Pas encore de messages. Commencez à discuter !",
+  "typeYourMessage": "Tapez votre message...",
+  "connectionLostReconnecting": "Connexion perdue. Reconnexion...",
+  "copyInviteLink": "Copier le Lien d'Invitation",
+  "linkCopied": "Lien Copié !"
+} 

@@ -1,0 +1,12 @@
+{
+  "send": "送信",
+  "confirmAndJoin": "確認して参加",
+  "confirmAndGenerate": "確認してQRを生成",
+  "partnerIsTyping": "相手が入力中です...",
+  "selectYourLanguage": "言語を選択してください：",
+  "noMessagesYet": "まだメッセージはありません。チャットを開始しましょう！",
+  "typeYourMessage": "メッセージを入力...",
+  "connectionLostReconnecting": "接続が失われました。再接続中...",
+  "copyInviteLink": "招待リンクをコピー",
+  "linkCopied": "リンクをコピーしました！"
+} 

@@ -21,6 +21,7 @@ import { useSocket, AppSocket } from '../context/SocketContext'; // Import the h
 import * as Localization from 'expo-localization'; // Import localization
 import { formatDistanceToNow } from 'date-fns'; // Import date-fns function
 import { Picker } from '@react-native-picker/picker'; // Use Picker
+import i18n, { setLocale } from '../translations/i18n.config'; // Import i18n config
 
 // Backend URL configuration
 // const BACKEND_URL = 'https://kodo-production.up.railway.app'; // REMOVE THIS - Provided by context
@@ -107,9 +108,7 @@ export default function JoinChatScreen() {
   const [uiStatus, setUiStatus] = useState('idle'); // idle, selecting_language, connecting, waiting, joined, error
   const [roomId, setRoomId] = useState<string | null>(passedRoomId || null);
   // --- Language State (Guest) ---
-  const defaultLanguage = Localization.getLocales()[0]?.languageCode || 'en';
-  // Initialize with default, host value comes later if applicable
-  const [myLanguage, setMyLanguage] = useState<string>(SUPPORTED_LANGUAGES.find(l => l.value === defaultLanguage) ? defaultLanguage : 'en');
+  const [myLanguage, setMyLanguage] = useState<string>(i18n.locale.substring(0,2));
   // -----------------------------
   const [partnerLanguage, setPartnerLanguage] = useState<string | null>(passedPartnerLanguage || null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -127,18 +126,22 @@ export default function JoinChatScreen() {
   // Set initial state based on navigation type
   useEffect(() => {
     if (token && !joined) {
-          setUiStatus('selecting_language'); // Start by asking for language
+          setUiStatus('selecting_language');
+          // Ensure i18n is set to the detected/default language initially
+          setLocale(myLanguage); 
       } else if (joined && passedRoomId) {
-          // Host navigated here
-          setMyLanguage(passedMyLanguage); // Host language passed via params
+          // Host navigated here - set MY language based on passed params
+          // This assumes the HOST's language was passed as myLanguage param
+          setMyLanguage(passedMyLanguage); 
+          setLocale(passedMyLanguage); // Set i18n to host's language
           setPartnerLanguage(passedPartnerLanguage);
           setRoomId(passedRoomId);
-          setUiStatus('joined'); // Already joined logically
+          setUiStatus('joined');
       } else {
           setError("Invalid page state.");
           setUiStatus('error');
       }
-  }, [token, joined, passedRoomId]); // Only run once on mount based on initial params
+  }, [token, joined, passedRoomId, passedMyLanguage, passedPartnerLanguage, myLanguage]); 
 
   // --- Effect 1: Ensure Connection (for guests, now runs AFTER language selection) ---
   useEffect(() => {
@@ -436,6 +439,13 @@ export default function JoinChatScreen() {
     }
   }, [inputText, roomId, partnerLeft, socket]); // Add socket dependency
 
+  // Update language in i18n when selected
+  const handleLanguageChange = (itemValue: string) => {
+      setMyLanguage(itemValue);
+      setLocale(itemValue); // Update i18n locale
+      console.log('i18n locale set to:', itemValue);
+  };
+  
   // Handler for confirming language selection
   const handleConfirmLanguage = () => {
       console.log(`Language confirmed: ${myLanguage}. Proceeding to connect.`);
@@ -478,13 +488,13 @@ export default function JoinChatScreen() {
   if (uiStatus === 'selecting_language') {
       return (
           <View style={[styles.centerStatus, {backgroundColor: theme.colors.background}]}>
-              <PaperText variant="titleMedium" style={{marginBottom: 15, color: theme.colors.onBackground}}>Select Your Language:</PaperText>
+              <PaperText variant="titleMedium" style={{marginBottom: 15, color: theme.colors.onBackground}}>{i18n.t('selectYourLanguage')}</PaperText>
               <View style={styles.pickerWrapper}> 
                 <Picker
                   selectedValue={myLanguage}
-                  style={[styles.picker, {backgroundColor: theme.colors.surface, color: theme.colors.onSurface}]} // Apply theme
+                  style={[styles.picker, {backgroundColor: theme.colors.surface, color: theme.colors.onSurface}]} 
                   dropdownIconColor={theme.colors.onSurfaceVariant}
-                  onValueChange={(newValue: string) => setMyLanguage(newValue)}
+                  onValueChange={handleLanguageChange} // Use updated handler
                 >
                   {SUPPORTED_LANGUAGES.map(lang => (
                     <Picker.Item key={lang.value} label={lang.label} value={lang.value} />
@@ -496,7 +506,7 @@ export default function JoinChatScreen() {
                   onPress={handleConfirmLanguage} 
                   style={{marginTop: 20}}
               >
-                  Confirm & Join Chat
+                  {i18n.t('confirmAndJoin')}
               </PaperButton>
           </View>
       );
@@ -560,7 +570,7 @@ export default function JoinChatScreen() {
             {isReconnecting && (
                 <View style={styles.reconnectingOverlay}>
                     <ActivityIndicator size="small" color="#FFF" />
-                    <PaperText style={styles.reconnectingText}>Connection lost. Reconnecting...</PaperText>
+                    <PaperText style={styles.reconnectingText}>{i18n.t('connectionLostReconnecting')}</PaperText>
                 </View>
             )}
             {partnerLeft && (
