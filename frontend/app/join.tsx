@@ -146,18 +146,13 @@ export default function JoinChatScreen() {
   // --- Effect 1: Ensure Connection (for guests, now runs AFTER language selection) ---
   useEffect(() => {
     let isActive = true;
-    console.log(`[Effect 1 Check] uiStatus: ${uiStatus}, isConnected: ${isConnected}, connectionAttempted: ${connectionAttempted.current}`);
-    // Only attempt connection if status is 'connecting', not connected, and not already attempted.
     if (uiStatus === 'connecting' && !isConnected && !connectionAttempted.current) {
       connectionAttempted.current = true;
       setError(null);
-      console.log('[Effect 1] Calling connect()...');
       
       connect()
         .then(() => {
            if (!isActive) return;
-           console.log('[Effect 1] connect() promise resolved.');
-           // isConnected state change will trigger Effect 2
         })
         .catch((err) => {
             if (!isActive) return;
@@ -176,28 +171,18 @@ export default function JoinChatScreen() {
     let hostCheckInterval: NodeJS.Timeout | null = null;
     let joinTimeout: NodeJS.Timeout | null = null;
     let isActive = true;
-    console.log(`[Effect 2 Check] uiStatus: ${uiStatus}, token: ${!!token}, joined: ${joined}, isConnected: ${isConnected}, socket: ${!!socket}, joinAttempted: ${joinAttempted.current}`);
 
-    // Only run if guest, connected, have token, and haven't tried joining yet
     if (uiStatus === 'connecting' && token && !joined && isConnected && socket && !joinAttempted.current) {
         joinAttempted.current = true; 
         setError(null);
-        console.log('[Effect 2] Conditions met. Emitting join and adding listeners.');
 
-        // Use the language selected by the user
-        // const userBLanguage = 'es'; // Old hardcoded value
         const userBLanguage = myLanguage;
         
-        // --- Setup Listeners FIRST --- 
         const handleConnectionTest = (data: any) => {
-            console.log('[handleConnectionTest] Received:', data);
         };
-        console.log('[Effect 2] Adding listener: connection_test');
-        socket.on('connection_test', handleConnectionTest);
 
         const handleJoinedRoom = ({ roomId: receivedRoomId, partnerLanguage: receivedPartnerLang }: { roomId: string, partnerLanguage: string }) => {
             if (!isActive) return;
-            console.log(`[handleJoinedRoom] EVENT RECEIVED! Room: ${receivedRoomId}, Partner Lang: ${receivedPartnerLang}`);
             if (hostCheckInterval) clearInterval(hostCheckInterval);
             if (joinTimeout) clearTimeout(joinTimeout);
           setRoomId(receivedRoomId);
@@ -209,13 +194,10 @@ export default function JoinChatScreen() {
         const handleWaitingForHost = (data: any) => {
             try {
                 if (!isActive) return;
-                console.log('[handleWaitingForHost] Received data:', data);
-                if (joinTimeout) clearTimeout(joinTimeout);
                 setUiStatus('waiting'); 
           setError(null);
                 if (hostCheckInterval) clearInterval(hostCheckInterval); 
                 hostCheckInterval = setInterval(() => {
-                    console.log(`Join screen (Guest): Still waiting for host...`);
                 }, 15000); 
             } catch (e: any) {
                 console.error('[handleWaitingForHost] Error processing event:', e);
@@ -234,18 +216,12 @@ export default function JoinChatScreen() {
             joinAttempted.current = false; 
         };
         
-        console.log('[Effect 2] Adding listeners: joinedRoom, waitingForHost, error');
         socket.on('joinedRoom', handleJoinedRoom);
         socket.on('waitingForHost', handleWaitingForHost);
         socket.on('error', handleError);
-        // --- End Listeners Setup ---
 
-        // Emit the join event WITH LANGUAGE
-        console.log(`[Effect 2] Emitting join event with token ${token} and lang ${userBLanguage}`);
         socket.emit('join', { token: token, language: userBLanguage });
-        console.log(`[Effect 2] <<<<<< AFTER EMITTING join event with token ${token}`);
 
-        // Set a timeout specifically for the join/wait phase
         joinTimeout = setTimeout(() => {
             if (isActive && uiStatus !== 'joined') { 
                 console.error("Join screen (Guest): Join/Wait timeout"); 
@@ -257,10 +233,8 @@ export default function JoinChatScreen() {
             }
           }, 90000); // Increased timeout to 90 seconds
           
-        // Cleanup function for THIS effect
         return () => {
             isActive = false;
-            console.log('[Effect 2 Cleanup] Removing join listeners and clearing timeouts.');
             if (joinTimeout) clearTimeout(joinTimeout);
             if (hostCheckInterval) clearInterval(hostCheckInterval);
             if (socket) {
@@ -269,11 +243,9 @@ export default function JoinChatScreen() {
                 socket.off('waitingForHost', handleWaitingForHost);
                 socket.off('error', handleError);
             }
-            // Don't reset joinAttempted here unless you want auto-retry on dependency change
         };
     }
     
-    // Logic for host remains largely the same, ensure state is set if navigated here
     else if (joined && passedRoomId && isConnected && uiStatus !== 'joined') {
         console.log(`[Effect 2 Host Check] Setting state for joined host. Room: ${passedRoomId}`);
         setRoomId(passedRoomId);
@@ -282,14 +254,11 @@ export default function JoinChatScreen() {
         setUiStatus('joined'); 
     }
     
-    // Dependencies: now includes myLanguage needed for the join emit
   }, [uiStatus, token, joined, isConnected, socket, disconnect, passedRoomId, passedMyLanguage, passedPartnerLanguage, myLanguage]); 
 
   // --- Effect 3: Chat Logic (runs once connection status is 'joined') ---
   useEffect(() => {
-    // Only run chat logic if joined successfully and socket is available
     if (uiStatus !== 'joined' || !roomId || !socket) {
-        // If we are supposed to be joined but socket is missing, it's an error
         if (uiStatus === 'joined' && !socket) {
             console.error("Chat logic: State is 'joined' but socket is missing!");
             setError("Connection lost unexpectedly.");
@@ -299,14 +268,11 @@ export default function JoinChatScreen() {
     }
     
     let isActive = true; 
-    console.log(`Chat logic: Socket active (ID: ${socket.id}) in room ${roomId}. Setting up listeners.`);
-    // If we were reconnecting, clear the flag now that we are joined and ready
     if (isReconnecting) {
         console.log("Chat logic: Reconnection successful.");
         setIsReconnecting(false);
     }
 
-    // --- Define Event Handlers ---
     const handleNewMessage = (message: any) => {
         if (!isActive) return;
         if (message.sender === 'partner') {
@@ -333,33 +299,22 @@ export default function JoinChatScreen() {
         Alert.alert('Chat Error', errorMessage.message || 'An unknown error occurred during chat.');
         setError(errorMessage.message || 'Chat error');
         setUiStatus('error');
-        // Consider disconnecting or navigating away
-        // disconnect(); 
-        // router.replace('/');
         setIsReconnecting(false);
     };
     const handleDisconnect = (reason: Socket.DisconnectReason) => {
         if (!isActive) return;
-        console.log('Disconnected during chat:', reason);
-        // Don't immediately go to error state if it was an unexpected disconnect
         if (reason !== 'io client disconnect' && uiStatus === 'joined') {
              console.log(`Connection lost: ${reason}. Attempting to reconnect...`);
              setError(null); // Clear previous errors
              setIsReconnecting(true); // Set reconnecting status
-             // uiStatus remains 'joined' logically, UI will show reconnecting overlay
-             // Socket.IO client will automatically try to reconnect based on context settings
-             // We could add a listener for explicit reconnect_failed event if needed
         }
     };
-    // <<< ADDED: Listener for reconnect success >>>
     const handleConnect = () => {
         if (!isActive || !isReconnecting) return; // Only handle if we were explicitly reconnecting
         console.log('Chat logic: Reconnect successful (handleConnect)');
         setIsReconnecting(false);
         setError(null);
-        // No need to change uiStatus, should still be 'joined'
     };
-     // <<< ADDED: Listener for permanent reconnect failure >>>
     const handleReconnectFailed = () => {
         if (!isActive) return;
         console.error('Chat logic: Permanent reconnection failure.');
@@ -367,36 +322,27 @@ export default function JoinChatScreen() {
         setIsReconnecting(false);
         setUiStatus('error'); // Now set error state
     };
-    // --- Typing Indicator Handlers ---
     const handlePartnerTyping = () => {
         if (!isActive) return;
-        // console.log("Partner started typing");
         setIsPartnerTyping(true);
     };
     const handlePartnerStoppedTyping = () => {
         if (!isActive) return;
-        // console.log("Partner stopped typing");
         setIsPartnerTyping(false);
     };
-    // -------------------------------
 
-    // --- Register Listeners ---
-    console.log("Chat logic: Attaching listeners (newMessage, partnerLeft, error, disconnect, connect, reconnect_failed, partnerTyping, partnerStoppedTyping)");
     socket.on('newMessage', handleNewMessage);
     socket.on('partnerLeft', handlePartnerLeft);
     socket.on('error', handleError);
     socket.on('disconnect', handleDisconnect);
-    socket.on('connect', handleConnect); // Listen for successful connect/reconnect
-    socket.io.on("reconnect_failed", handleReconnectFailed); // Listen for permanent failure
-    // Typing listeners
+    socket.on('connect', handleConnect);
+    socket.io.on("reconnect_failed", handleReconnectFailed);
     socket.on('partnerTyping', handlePartnerTyping);
     socket.on('partnerStoppedTyping', handlePartnerStoppedTyping);
 
-    // --- Cleanup Chat Listeners ---
     return () => {
       isActive = false;
       console.log('Chat logic: Cleaning up listeners for room', roomId);
-      // Remove listeners when component unmounts or state changes
       if (socket) {
         socket.off('newMessage', handleNewMessage);
         socket.off('partnerLeft', handlePartnerLeft);
@@ -404,16 +350,11 @@ export default function JoinChatScreen() {
         socket.off('disconnect', handleDisconnect);
         socket.off('connect', handleConnect);
         socket.io.off("reconnect_failed", handleReconnectFailed);
-        // Typing listeners cleanup
         socket.off('partnerTyping', handlePartnerTyping);
         socket.off('partnerStoppedTyping', handlePartnerStoppedTyping);
       }
-      // We disconnect globally when LEAVING the chat screen, not just on effect cleanup
-      // This is handled by the context provider cleanup now, or could be done via router events
-      // disconnect(); // Moved disconnect call out of here
     };
-    // Depend on socket instance and joined state
-  }, [uiStatus, roomId, socket, disconnect, isReconnecting]); // Added isReconnecting dependency
+  }, [uiStatus, roomId, socket, disconnect, isReconnecting]);
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -522,10 +463,6 @@ export default function JoinChatScreen() {
         <View style={[styles.centerStatus, {backgroundColor: theme.colors.background}]}>
             <ActivityIndicator size="large" color={theme.colors.primary}/>
             <PaperText style={[styles.statusText, {color: theme.colors.onBackground}]}>{statusMessage}</PaperText>
-            {/* Display Debug Info */}
-            <PaperText style={styles.debugText}>Status: {uiStatus}</PaperText>
-            <PaperText style={styles.debugText}>Socket Connected: {isConnected ? 'Yes' : 'No'}</PaperText>
-            {socket?.id && <PaperText style={styles.debugText}>Socket ID: {socket.id}</PaperText>}
             {uiStatus === 'waiting' && (
                 <PaperText style={styles.waitingText}>
                     Please keep this screen open.

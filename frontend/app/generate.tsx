@@ -62,17 +62,14 @@ export default function GenerateQRScreen() {
 
   // Effect 1: Fetch token and connect socket AFTER language is confirmed
   useEffect(() => {
-    // Only run if language confirmed, not already connected, and process not initiated
     if (languageConfirmed && !isConnected && !hasInitiatedProcess.current) { 
       hasInitiatedProcess.current = true; 
       
-      console.log(`Generate QR Screen: Language ${myLanguage} confirmed. Fetching token...`);
       setStatus('Requesting QR Code...');
       setError(null);
 
       let fetchedToken: string | null = null;
 
-      // Send language preference when fetching token
       fetch(`${BACKEND_URL}/generate-qr`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,87 +83,64 @@ export default function GenerateQRScreen() {
         fetchedToken = data.token;
         if (!fetchedToken) throw new Error('Backend did not provide a token.');
         
-        console.log('Token received:', fetchedToken);
         setQrToken(fetchedToken); 
         const joinUrl = `${webAppBaseUrl}/join?token=${fetchedToken}`;
         setQrUrl(joinUrl);
-        console.log("Generated QR URL:", joinUrl);
         setStatus('Connecting to chat service...');
         
-        // Connect socket
         return connect(); 
       })
       .then((connectedSocket) => {
           if (!connectedSocket) throw new Error("Socket connection failed or wasn't available.");
-          console.log('Socket connected via context, ID:', connectedSocket.id);
-          // Status updated by Effect 2
       })
       .catch(err => {
         console.error('Error during token generation or initial socket connection:', err);
         setError(`Setup failed: ${err.message}`);
         setStatus('Error');
-        hasInitiatedProcess.current = false; // Allow retry by confirming language again?
-        setLanguageConfirmed(false); // Go back to language selection on error
+        hasInitiatedProcess.current = false; 
+        setLanguageConfirmed(false); 
       });
     }
-    // Dependencies: Trigger when language is confirmed or connection status changes
   }, [languageConfirmed, isConnected, connect, myLanguage]); 
 
   // Effect 2: Set up socket listeners (mostly unchanged, runs when connected)
   useEffect(() => {
     if (isConnected && socket && qrToken) {
-      console.log(`[Effect 2] Running: Socket connected, token available. Language: ${myLanguage}`);
       setStatus('Listening for partner... (Scan QR Code)');
-      console.log(`[Effect 2] Status *should* be: Listening for partner...`); 
 
-      // Emit listenForToken now that we are connected and have the token AND LANGUAGE
-      console.log(`[Effect 2] Emitting listenForToken for token: ${qrToken} with language ${myLanguage}`);
-      socket.emit('listenForToken', { token: qrToken, language: myLanguage }); // Send language
+      socket.emit('listenForToken', { token: qrToken, language: myLanguage });
 
-      // Handler for joinedRoom event
       const handleJoinedRoom = ({ roomId, partnerLanguage }: { roomId: string; partnerLanguage: string }) => {
-        console.log(`[handleJoinedRoom] Triggered. My lang: ${myLanguage}, Partner Lang: ${partnerLanguage}. Setting status to: Partner joined! Navigating...`);
         setStatus('Partner joined! Navigating...'); 
         setTimeout(() => {
-            console.log('[handleJoinedRoom] Navigating after delay...');
             router.push({
               pathname: '/join',
-              // Pass MY language to the chat screen
               params: { roomId, myLanguage: myLanguage, partnerLanguage, joined: 'true' }
             } as any);
         }, 500); 
       };
       
-      // Handler for error event
       const handleError = (errorMessage: { message: string }) => {
           console.error('[handleError] Triggered. Error from server via socket:', errorMessage);
           setError(errorMessage.message || 'Server error during connection/wait');
           setStatus('Error listening for partner');
       };
 
-      // Add listeners
-      console.log('[Effect 2] Adding socket listeners (joinedRoom, error)');
       socket.on('joinedRoom', handleJoinedRoom);
       socket.on('error', handleError);
 
-      // Cleanup listeners when effect re-runs or component unmounts
       return () => {
-          console.log("[Effect 2 Cleanup] Cleaning up socket listeners");
-          // Check if socket still exists before removing listeners
           if(socket) {
             socket.off('joinedRoom', handleJoinedRoom);
             socket.off('error', handleError);
           }
       };
     } else {
-        // Log why this effect might not be running
-        console.log(`[Effect 2] Skipped: isConnected=${isConnected}, socket exists=${!!socket}, qrToken exists=${!!qrToken}`);
     }
-  }, [isConnected, socket, qrToken, router, myLanguage]); // Add myLanguage dependency
+  }, [isConnected, socket, qrToken, router, myLanguage]); 
 
   // Handler for confirm button
   const handleConfirmLanguage = () => {
-      console.log("Language confirmed:", myLanguage);
       setLanguageConfirmed(true);
   };
 
@@ -174,7 +148,6 @@ export default function GenerateQRScreen() {
   const handleLanguageChange = (itemValue: string) => {
       setMyLanguage(itemValue);
       setLocale(itemValue); // Update i18n locale
-      console.log('i18n locale set to:', itemValue);
   };
 
   // --- Copy Link Handler ---
@@ -188,7 +161,6 @@ export default function GenerateQRScreen() {
   };
 
   // --- Render Logic --- 
-  console.log(`[Render] Status: "${status}", QR URL Ready: ${!!qrUrl}, Error: ${error}`);
 
   return (
     <ScrollView contentContainerStyle={[styles.scrollContainer, {backgroundColor: theme.colors.background}]}>

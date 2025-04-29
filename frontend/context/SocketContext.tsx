@@ -10,7 +10,7 @@ import { DefaultEventsMap } from '@socket.io/component-emitter';
 const BACKEND_URL = 'https://kodo-backend-s7vj.onrender.com'; // NEW Render Backend URL
 const SOCKET_NAMESPACE = '/backend-temp'; // Use the correct namespace
 
-console.log('SocketContext Using BACKEND_URL:', BACKEND_URL);
+// console.log('SocketContext Using BACKEND_URL:', BACKEND_URL); // REMOVE LOG
 
 // Type for the socket instance
 export type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
@@ -33,13 +33,12 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
 
   const connect = useCallback(async (): Promise<AppSocket> => {
-    // Prevent multiple connections
     if (socket?.connected) {
-        console.log('Socket already connected.');
+        // console.log('Socket already connected.'); // REMOVE LOG
         return socket;
     }
 
-    console.log(`SocketContext: Attempting connection to ${BACKEND_URL}${SOCKET_NAMESPACE}...`);
+    // console.log(`SocketContext: Attempting connection to ${BACKEND_URL}${SOCKET_NAMESPACE}...`); // REMOVE LOG
     const newSocket = io(`${BACKEND_URL}${SOCKET_NAMESPACE}`, {
       reconnectionAttempts: 30, // Try for ~2-3 minutes before failing
       timeout: 60000, // Keep increased timeout
@@ -54,20 +53,20 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     // Return a promise that resolves on connect or rejects on error
     return new Promise((resolve, reject) => {
         newSocket.on('connect', () => {
-            console.log('SocketContext: Connected! ID:', newSocket.id);
+            // console.log('SocketContext: Connected! ID:', newSocket.id); // REMOVE LOG
             setIsConnected(true);
             resolve(newSocket);
         });
 
         newSocket.on('disconnect', (reason) => {
-            console.log('SocketContext: Disconnected.', reason);
+            // console.log('SocketContext: Disconnected.', reason); // REMOVE LOG
             setIsConnected(false);
             // Consider automatic cleanup or state reset if needed
             // setSocket(null); // Optionally clear socket on disconnect
         });
 
         newSocket.on('connect_error', (err) => {
-            console.error('SocketContext: Connection Error:', err);
+            console.error('SocketContext: Connection Error:', err); // Keep error log
             setIsConnected(false);
             setSocket(null); // Clear broken socket
             reject(err);
@@ -80,7 +79,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   const disconnect = useCallback(() => {
     if (socket) {
-      console.log('SocketContext: Disconnecting socket...');
+      // console.log('SocketContext: Disconnecting socket...'); // REMOVE LOG
       socket.disconnect();
       setSocket(null);
       setIsConnected(false);
