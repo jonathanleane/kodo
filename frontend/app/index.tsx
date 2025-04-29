@@ -1,24 +1,42 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet, Image } from 'react-native';
 import { Link, Href } from 'expo-router';
-import { Button, Text as PaperText, useTheme } from 'react-native-paper'; // Use Paper components and theme
+import { Button, Text as PaperText, useTheme } from 'react-native-paper';
 
 export default function HomeScreen() {
-  const theme = useTheme(); // Access theme
+  const theme = useTheme();
 
   return (
-    // Use theme background color
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Use PaperText with theme variants */}
-      <PaperText variant="displayMedium" style={styles.title}>Kodo Chat</PaperText>
-      <PaperText variant="titleMedium" style={styles.subtitle}>Real-Time Translation</PaperText>
+      {/* Optional: Add an engaging graphic/icon */}
+      {/* <Image source={require('../assets/images/your-logo.png')} style={styles.logo} /> */}
+      
+      <PaperText variant="headlineLarge" style={[styles.title, {color: theme.colors.primary}]}>Kodo Chat</PaperText>
+      <PaperText variant="titleMedium" style={styles.subtitle}>
+        Chat instantly across languages.
+      </PaperText>
+      <PaperText variant="bodyLarge" style={styles.description}>
+        Break down barriers with real-time, AI-powered translation directly in your chat.
+      </PaperText>
       
       <Link href={"/generate" as Href} asChild>
-        <Button mode="contained" style={styles.button} contentStyle={styles.buttonContent}>
-            Start New Chat
+        <Button 
+          mode="contained" 
+          style={styles.button} 
+          contentStyle={styles.buttonContent}
+          labelStyle={styles.buttonLabel}
+        >
+            Start a New Chat Session
         </Button>
       </Link>
-      <PaperText variant="bodyMedium" style={styles.info}>To join a chat, scan a QR code or use an invite link.</PaperText>
+      
+      <View style={styles.instructionsContainer}>
+          <PaperText variant="titleSmall" style={styles.instructionsTitle}>How it works:</PaperText>
+          <PaperText style={styles.instructionStep}>1. Click "Start New Chat Session".</PaperText>
+          <PaperText style={styles.instructionStep}>2. Select your language.</PaperText>
+          <PaperText style={styles.instructionStep}>3. Share the QR code or link with your chat partner.</PaperText>
+      </View>
+
     </View>
   );
 }
@@ -28,28 +46,58 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 25,
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    marginBottom: 30,
   },
   title: {
-    marginBottom: 10,
+    marginBottom: 8,
     textAlign: 'center',
+    fontWeight: 'bold',
   },
   subtitle: {
-    marginBottom: 40,
+    marginBottom: 25,
     textAlign: 'center',
-    color: '#555', // Use a slightly muted color or theme color
+    color: '#555',
+  },
+  description: {
+      marginBottom: 45,
+      textAlign: 'center',
+      paddingHorizontal: 20,
+      lineHeight: 22,
+      color: '#333',
   },
   button: {
-    paddingVertical: 8, // Add vertical padding inside button
-    marginBottom: 30,
-    borderRadius: 30, // Make button rounder
+    paddingVertical: 10,
+    marginBottom: 40,
+    borderRadius: 30, 
+    elevation: 2,
   },
   buttonContent: {
-    paddingHorizontal: 10, // Add horizontal padding for text
+    paddingHorizontal: 20,
   },
-  info: {
-    textAlign: 'center',
-    color: 'grey',
-    marginTop: 20,
-  }
+  buttonLabel: {
+      fontSize: 16,
+      fontWeight: 'bold',
+  },
+  instructionsContainer: {
+      marginTop: 30,
+      alignItems: 'center',
+      padding: 15,
+      backgroundColor: 'rgba(0, 128, 128, 0.05)',
+      borderRadius: 8,
+      width: '90%',
+      maxWidth: 500,
+  },
+  instructionsTitle: {
+      marginBottom: 10,
+      fontWeight: 'bold',
+  },
+  instructionStep: {
+      marginBottom: 5,
+      color: '#444',
+  },
 }); 
