@@ -35,12 +35,16 @@ const SUPPORTED_LANGUAGES = [
   { label: 'Türkçe', value: 'tr' },
 ];
 
-// HARDCODE for now to ensure correct URL is used
-const BACKEND_URL = 'https://kodo-backend-s7vj.onrender.com'; // NEW Render Backend URL
-const FRONTEND_URL = 'https://kodo-frontend.onrender.com'; // Use the actual Render Frontend URL
+// --- URLs --- 
+// Revert to using ENV VARS with fallbacks for local dev
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3001'; 
+const FRONTEND_URL = process.env.EXPO_PUBLIC_FRONTEND_URL || 'http://localhost:8081';
+// Remove hardcoded URLs
+// const BACKEND_URL = 'https://kodo-backend-s7vj.onrender.com'; 
+// const FRONTEND_URL = 'https://kodo-frontend.onrender.com'; 
 
-console.log('Using BACKEND_URL:', BACKEND_URL);
-console.log('Using FRONTEND_URL:', FRONTEND_URL);
+console.log('[Generate] Using BACKEND_URL:', BACKEND_URL);
+console.log('[Generate] Using FRONTEND_URL:', FRONTEND_URL);
 
 export default function GenerateQRScreen() {
   const [qrToken, setQrToken] = useState<string | null>(null);

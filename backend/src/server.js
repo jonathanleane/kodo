@@ -572,8 +572,11 @@ function handleSocketConnection(socket) {
 
                 } catch (error) {
                     console.error("Error calling OpenAI API:", error.message || error);
-                    translationError = "(Translation failed)";
-                    // Optionally emit a specific error event to the sender
+                    // Send original text back with an error flag/note
+                    translationError = messageText; // Send original back
+                    // Add a flag or modify structure slightly to indicate failure
+                    // For simplicity, we'll just send original as translated for now
+                    // A better approach might be: { original: messageText, translated: null, error: "Translation Failed" }
                     // socket.emit('translationError', { original: messageText });
                 }
             } else {
@@ -583,7 +586,10 @@ function handleSocketConnection(socket) {
             // 5. Emit 'newMessage' events
             const messagePayload = {
                 original: messageText,
-                translated: translationError || translatedText,
+                // If translationError is set (meaning API call failed or languages same),
+                // use the original text for the 'translated' field as well.
+                // Frontend can check if original === translated to know if translation happened.
+                translated: translationError !== null ? translationError : translatedText,
                 sender: '' // This will be set per recipient
             };
 

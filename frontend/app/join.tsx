@@ -61,7 +61,8 @@ const MessageBubble = React.memo(({ message, myLanguage }: { message: any, myLan
   // Determine primary and alternate text based on sender
   const primaryText = isSelf ? message.original : message.translated;
   const alternateText = isSelf ? message.translated : message.original;
-  const showTranslationToggle = message.original !== message.translated;
+  // Only show toggle if translation actually happened AND succeeded
+  const wasTranslated = message.original !== message.translated;
   
   // Format timestamp if available
   const formattedTimestamp = message.timestamp
@@ -73,16 +74,18 @@ const MessageBubble = React.memo(({ message, myLanguage }: { message: any, myLan
       <View style={[styles.messageBubble, isSelf ? styles.messageBubbleSelf : styles.messageBubblePartner]}>
         <View style={styles.messageContentRow}> 
           <Text style={styles.messagePrimaryText}>{primaryText}</Text>
-          {showTranslationToggle && (
+          {/* Show toggle only if it was successfully translated */}
+          {wasTranslated && (
               <IconButton
-                  icon="translate" // Or use another icon like "eye" or "swap-horizontal"
+                  icon="translate"
                   size={16}
                   style={styles.translateIcon}
                   onPress={() => setShowAlternate(!showAlternate)}
               />
           )}
         </View>
-        {showAlternate && showTranslationToggle && (
+        {/* Show alternate only if toggle is active AND it was successfully translated */}
+        {showAlternate && wasTranslated && (
           <Text style={styles.messageAlternateText}>({alternateText})</Text>
         )}
         {/* Display Timestamp */}
@@ -291,7 +294,8 @@ export default function JoinChatScreen() {
         if (!isActive) return;
         console.log('Partner left the chat');
         setPartnerLeft(true);
-        Alert.alert("Partner Left", "Your chat partner has left the room.");
+        // Alert.alert("Partner Left", "Your chat partner has left the room."); // Remove Alert
+        // UI is already updated via the partnerLeft state check in render
     };
     const handleError = (errorMessage: { message: string }) => {
         if (!isActive) return;

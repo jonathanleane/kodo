@@ -2,15 +2,13 @@ import React, { createContext, useState, useContext, useEffect, ReactNode, useCa
 import io, { Socket } from 'socket.io-client';
 import { DefaultEventsMap } from '@socket.io/component-emitter';
 
-// Use environment variable provided by the build environment
-// Fallback to hardcoded value only if environment variable is not set
-// const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://kodo-backend-production.up.railway.app'; 
+// Revert to using ENV VARS with fallbacks for local dev
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3001'; 
+// Remove hardcoded URL
+// const BACKEND_URL = 'https://kodo-backend-s7vj.onrender.com'; 
+const SOCKET_NAMESPACE = '/backend-temp'; 
 
-// HARDCODE for now to ensure correct URL is used
-const BACKEND_URL = 'https://kodo-backend-s7vj.onrender.com'; // NEW Render Backend URL
-const SOCKET_NAMESPACE = '/backend-temp'; // Use the correct namespace
-
-// console.log('SocketContext Using BACKEND_URL:', BACKEND_URL); // REMOVE LOG
+console.log('[SocketContext] Using BACKEND_URL:', BACKEND_URL);
 
 // Type for the socket instance
 export type AppSocket = Socket<DefaultEventsMap, DefaultEventsMap>;
