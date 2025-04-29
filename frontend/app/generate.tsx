@@ -29,6 +29,9 @@ const SUPPORTED_LANGUAGES = [
   { label: 'हिन्दी', value: 'hi' },
   { label: 'Bahasa Indonesia', value: 'id' },
   { label: 'Tagalog (Filipino)', value: 'tl' },
+  { label: 'ไทย', value: 'th' },
+  { label: 'Tiếng Việt', value: 'vi' },
+  { label: 'Türkçe', value: 'tr' },
 ];
 
 // HARDCODE for now to ensure correct URL is used

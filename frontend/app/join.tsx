@@ -47,6 +47,9 @@ const SUPPORTED_LANGUAGES = [
   { label: 'हिन्दी', value: 'hi' },
   { label: 'Bahasa Indonesia', value: 'id' },
   { label: 'Tagalog (Filipino)', value: 'tl' },
+  { label: 'ไทย', value: 'th' },
+  { label: 'Tiếng Việt', value: 'vi' },
+  { label: 'Türkçe', value: 'tr' },
 ];
 
 // --- Message Bubble Component ---
@@ -123,7 +126,7 @@ export default function JoinChatScreen() {
 
   // Set initial state based on navigation type
   useEffect(() => {
-      if (token && !joined) {
+    if (token && !joined) {
           setUiStatus('selecting_language'); // Start by asking for language
       } else if (joined && passedRoomId) {
           // Host navigated here
@@ -194,10 +197,10 @@ export default function JoinChatScreen() {
             console.log(`[handleJoinedRoom] EVENT RECEIVED! Room: ${receivedRoomId}, Partner Lang: ${receivedPartnerLang}`);
             if (hostCheckInterval) clearInterval(hostCheckInterval);
             if (joinTimeout) clearTimeout(joinTimeout);
-            setRoomId(receivedRoomId);
-            setPartnerLanguage(receivedPartnerLang);
+          setRoomId(receivedRoomId);
+          setPartnerLanguage(receivedPartnerLang);
             setUiStatus('joined');
-            setError(null);
+          setError(null);
         };
 
         const handleWaitingForHost = (data: any) => {
@@ -206,7 +209,7 @@ export default function JoinChatScreen() {
                 console.log('[handleWaitingForHost] Received data:', data);
                 if (joinTimeout) clearTimeout(joinTimeout);
                 setUiStatus('waiting'); 
-                setError(null);
+          setError(null);
                 if (hostCheckInterval) clearInterval(hostCheckInterval); 
                 hostCheckInterval = setInterval(() => {
                     console.log(`Join screen (Guest): Still waiting for host...`);
@@ -378,8 +381,8 @@ export default function JoinChatScreen() {
     console.log("Chat logic: Attaching listeners (newMessage, partnerLeft, error, disconnect, connect, reconnect_failed, partnerTyping, partnerStoppedTyping)");
     socket.on('newMessage', handleNewMessage);
     socket.on('partnerLeft', handlePartnerLeft);
-    socket.on('error', handleError); 
-    socket.on('disconnect', handleDisconnect); 
+    socket.on('error', handleError);
+    socket.on('disconnect', handleDisconnect);
     socket.on('connect', handleConnect); // Listen for successful connect/reconnect
     socket.io.on("reconnect_failed", handleReconnectFailed); // Listen for permanent failure
     // Typing listeners
